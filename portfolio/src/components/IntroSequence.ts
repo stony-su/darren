@@ -24,24 +24,24 @@ interface IntroLine {
 /* ── Per-sentence image stickers ── */
 
 const WEBSITE_STICKERS: StickerConfig[] = [
-  { src: '/pictures/websites/5q1dcsong1.jpg',         left: '4%',  top: '10%',    rotation: -8,  width: 'clamp(280px, 36vw, 600px)', delay: 0 },
-  { src: '/pictures/websites/chrome_5HrZmrCiJh.png',  right: '4%', top: '10%',    rotation: 6,   width: 'clamp(280px, 34vw, 580px)', delay: 120 },
-  { src: '/pictures/websites/chrome_cL5et3zIG2.jpg',  left: '8%',  bottom: '10%', rotation: 5,   width: 'clamp(260px, 32vw, 560px)', delay: 240 },
-  { src: '/pictures/websites/chrome_dvATHhXx82.png',  right: '8%', bottom: '10%', rotation: -5,  width: 'clamp(280px, 34vw, 590px)', delay: 360 },
+  { src: '/pictures/websites/5q1dcsong1.jpg',         left: '4%',  top: '10%',    rotation: -8,  width: 'clamp(280px, 28vw, 420px)', delay: 0 },
+  { src: '/pictures/websites/chrome_5HrZmrCiJh.png',  right: '4%', top: '10%',    rotation: 6,   width: 'clamp(280px, 28vw, 420px)', delay: 120 },
+  { src: '/pictures/websites/chrome_cL5et3zIG2.jpg',  left: '8%',  bottom: '5%',  rotation: 5,   width: 'clamp(280px, 28vw, 420px)', delay: 240 },
+  { src: '/pictures/websites/chrome_dvATHhXx82.png',  right: '8%', bottom: '5%',  rotation: -5,  width: 'clamp(280px, 28vw, 420px)', delay: 360 },
 ];
 
 const BOOK_STICKERS: StickerConfig[] = [
-  { src: '/pictures/books/71A6umHGhhL._UF894,1000_QL80_.jpg',  left: '4%',  top: '10%',    rotation: -6, width: 'clamp(180px, 19.5vw, 315px)', delay: 0 },
-  { src: '/pictures/books/71Hp0VjEETL._UF1000,1000_QL80_.jpg', right: '4%', top: '10%',    rotation: 8,  width: 'clamp(180px, 19.5vw, 300px)', delay: 150 },
-  { src: '/pictures/books/71yt6mN5HuL.jpg',                    left: '8%',  bottom: '10%', rotation: 4,  width: 'clamp(165px, 19vw, 315px)', delay: 300 },
-  { src: '/pictures/books/name of the wind.jpg',                right: '8%', bottom: '10%', rotation: -7, width: 'clamp(180px, 19.5vw, 308px)', delay: 200 },
+  { src: '/pictures/books/71A6umHGhhL._UF894,1000_QL80_.jpg',  left: '4%',  top: '10%',    rotation: -6, width: 'clamp(170px, 16vw, 240px)', delay: 0 },
+  { src: '/pictures/books/71Hp0VjEETL._UF1000,1000_QL80_.jpg', right: '4%', top: '10%',    rotation: 8,  width: 'clamp(170px, 16vw, 240px)', delay: 150 },
+  { src: '/pictures/books/71yt6mN5HuL.jpg',                    left: '8%',  bottom: '10%', rotation: 4,  width: 'clamp(170px, 16vw, 240px)', delay: 300 },
+  { src: '/pictures/books/name of the wind.jpg',                right: '8%', bottom: '10%', rotation: -7, width: 'clamp(170px, 16vw, 240px)', delay: 200 },
 ];
 
 const HOCKEY_STICKERS: StickerConfig[] = [
-  { src: '/pictures/hockey/mmexport1676255013225.jpg',   left: '4%',  top: '10%',    rotation: -5, width: 'clamp(280px, 36vw, 600px)', delay: 0 },
-  { src: '/pictures/hockey/PXL_20230212_013808761.jpg',  right: '4%', top: '10%',    rotation: 7,  width: 'clamp(280px, 34vw, 580px)', delay: 120 },
-  { src: '/pictures/hockey/PXL_20230321_004747088.jpg',  left: '8%',  bottom: '10%', rotation: 6,  width: 'clamp(260px, 34vw, 560px)', delay: 240 },
-  { src: '/pictures/hockey/PXL_20240118_010237560.jpg',  right: '8%', bottom: '10%', rotation: -4, width: 'clamp(260px, 32vw, 550px)', delay: 360 },
+  { src: '/pictures/hockey/mmexport1676255013225.jpg',   left: '4%',  top: '10%',    rotation: -5, width: 'clamp(280px, 28vw, 420px)', delay: 0 },
+  { src: '/pictures/hockey/PXL_20230212_013808761.jpg',  right: '4%', top: '10%',    rotation: 7,  width: 'clamp(280px, 28vw, 420px)', delay: 120 },
+  { src: '/pictures/hockey/PXL_20230321_004747088.jpg',  left: '8%',  bottom: '5%',  rotation: 6,  width: 'clamp(280px, 28vw, 420px)', delay: 240 },
+  { src: '/pictures/hockey/PXL_20240118_010237560.jpg',  right: '8%', bottom: '5%',  rotation: -4, width: 'clamp(280px, 28vw, 420px)', delay: 360 },
 ];
 
 /* ── The six intro sentences ── */
@@ -131,11 +131,12 @@ export class IntroSequence {
     document.body.style.overflow = 'auto';
     document.body.style.overflowX = 'hidden';
 
-    /* Create scroll spacer — each line gets 100vh of scroll space, plus an extra section to scroll out */
+    /* Create scroll spacer — each line gets 100vh of scroll space, plus extra buffer to ensure
+       the user can always scroll past the last line (avoids sub-pixel rounding issues on laptops) */
     const spacer = document.createElement('div');
     spacer.id = 'intro-scroll-spacer';
     spacer.style.width = '100%';
-    spacer.style.height = `${(INTRO_LINES.length + 1) * 100}vh`;
+    spacer.style.height = `${(INTRO_LINES.length + 2) * 100}vh`;
     spacer.style.position = 'relative';
     spacer.style.zIndex = '0';
     spacer.style.pointerEvents = 'none';
@@ -198,9 +199,14 @@ export class IntroSequence {
           img.src = cfg.src;
           img.alt = '';
           img.draggable = false;
+
+          // Determine aspect ratio — books use 2:3 portrait, everything else 16:10 landscape
+          const isBook = cfg.src.includes('/books/');
+          const aspectRatio = isBook ? '2 / 3' : '16 / 10';
+
           Object.assign(img.style, {
             width: '100%',
-            height: 'auto',
+            aspectRatio,
             display: 'block',
             borderRadius: '10px',
             border: `3px solid ${THEME_BORDER[line.theme] ?? 'rgba(255,255,255,0.8)'}`,
@@ -251,7 +257,9 @@ export class IntroSequence {
     const targetIndex = Math.min(rawIndex, INTRO_LINES.length - 1);
 
     // Past the last section → complete
-    if (scrollY >= INTRO_LINES.length * vh) {
+    // Use a tolerance to handle sub-pixel rounding that can prevent reaching the exact threshold on some screens
+    const maxScroll = document.documentElement.scrollHeight - vh;
+    if (scrollY >= INTRO_LINES.length * vh - vh * 0.15 || scrollY >= maxScroll - 5) {
       this.completeIntro();
       return;
     }

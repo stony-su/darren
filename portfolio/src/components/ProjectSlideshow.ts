@@ -305,8 +305,9 @@ export class ProjectSlideshow {
             const theme = parseInt(entry.target.getAttribute('data-theme') || '0');
             this.scene.setColorMode(theme);
 
-            // Enable attract mode on all slides
-            this.scene.setAttract(true);
+            // Only enable attract mode on the title and closing slides
+            const isAttractSlide = entry.target === titleSlide || entry.target === closingSlide;
+            this.scene.setAttract(isAttractSlide);
           }
         });
       },
