@@ -1,0 +1,223 @@
+@import 'tailwindcss';
+
+/* ── Tailwind Theme Extension ── */
+@theme {
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+}
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #111122;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbar on slideshow */
+#project-slideshow::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Intro Line Animations ── */
+
+.intro-line {
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              filter 0.6s ease;
+  will-change: opacity, transform, filter;
+}
+
+/* Sticker pop-in base */
+.sticker {
+  will-change: transform, opacity;
+}
+
+.sticker img {
+  transition: box-shadow 0.3s ease;
+}
+
+/* Rise up */
+.intro-line-rise {
+  transform: translateY(30px);
+}
+.intro-line-rise.intro-line-active {
+  transform: translateY(0);
+}
+.intro-line-rise.intro-line-exit {
+  transform: translateY(-20px);
+}
+
+/* Letter spacing expand */
+.intro-line-letter {
+  letter-spacing: -0.02em;
+  transform: scale(0.96);
+}
+.intro-line-letter.intro-line-active {
+  letter-spacing: 0.15em;
+  transform: scale(1);
+}
+.intro-line-letter.intro-line-exit {
+  letter-spacing: 0.3em;
+  opacity: 0 !important;
+}
+
+/* Scale in */
+.intro-line-scale {
+  transform: scale(0.85);
+}
+.intro-line-scale.intro-line-active {
+  transform: scale(1);
+}
+.intro-line-scale.intro-line-exit {
+  transform: scale(1.05);
+}
+
+/* Slide from right */
+.intro-line-slide {
+  transform: translateX(60px);
+}
+.intro-line-slide.intro-line-active {
+  transform: translateX(0);
+}
+.intro-line-slide.intro-line-exit {
+  transform: translateX(-60px);
+}
+
+/* Blur unblur */
+.intro-line-blur {
+  filter: blur(12px);
+  transform: scale(1.05);
+}
+.intro-line-blur.intro-line-active {
+  filter: blur(0px);
+  transform: scale(1);
+}
+.intro-line-blur.intro-line-exit {
+  filter: blur(8px);
+  transform: scale(0.97);
+}
+
+/* ── Project Card Animations ── */
+
+.project-card {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.5s ease;
+}
+
+.project-card:hover {
+  transform: translateY(-4px) rotate(-0.3deg);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.4),
+    0 0 80px -20px rgba(100, 100, 255, 0.08);
+}
+
+/* ── Slide Title ── */
+
+.slide-title-enter {
+  animation: slideTitleIn 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes slideTitleIn {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* ── Selection colors ── */
+::selection {
+  background: rgba(129, 140, 248, 0.3);
+  color: #e0e7ff;
+}
+
+/* ── Scroll hint subtle bounce ── */
+.scroll-hint {
+  animation: scrollHintBounce 2s ease-in-out infinite;
+}
+
+@keyframes scrollHintBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+/* Hide scrollbar during intro */
+body::-webkit-scrollbar {
+  display: none;
+}
+body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Video Scrub Bar ── */
+
+.video-scrub {
+  padding: 8px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  z-index: 5;
+  cursor: pointer;
+}
+
+.video-scrub-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: height 0.15s ease;
+}
+
+.video-scrub:hover .video-scrub-track {
+  height: 6px;
+}
+
+.video-scrub-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  width: 0%;
+  pointer-events: none;
+}
+
+.video-scrub-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.15s ease;
+  pointer-events: none;
+}
+
+.video-scrub:hover .video-scrub-thumb {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ── Subtle grain overlay for depth ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
