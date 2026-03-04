@@ -57,7 +57,7 @@ export const PROJECTS: Project[] = [
       "See how far I've come! I made this when I was in grade 9",
     image: '/pictures/websites/chrome_OAPAuGFtV4.png',
     tags: ['HTML', 'CSS', 'PHP', 'JS'],
-    liveUrl: 'https://wenxuansu.com/',
+    liveUrl: 'https://stony-su.github.io/personal-website/',
     repoUrl: 'https://github.com/stony-su/personal-website/tree/main',
     theme: 4,
   },
