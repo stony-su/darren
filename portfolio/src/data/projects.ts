@@ -65,7 +65,7 @@ export const PROJECTS: Project[] = [
     title: 'Turntable',
     description:
       'Three.js Interactive Turntable. Made with Three.js. Drag the vinyl into the table and watch it spin!',
-    image: '/pictures/websites/turntable.png',
+    image: '/pictures/websites/Turntable.png',
     tags: ['Three.js'],
     liveUrl: 'https://vinyl-turntable.vercel.app/',
     repoUrl: 'https://github.com/stony-su/vinyl-turntable',
