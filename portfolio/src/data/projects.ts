@@ -23,7 +23,7 @@ export const PROJECTS: Project[] = [
   {
     title: 'Onyx',
     description:
-      'A indie platform made at a Shanghai game jam for high school students. Built with Unity',
+      'A indie platformer made at a Shanghai game jam for high school students. Built with Unity',
     image: '/pictures/websites/onyx.png',
     tags: ['Unity', 'C#'],
     liveUrl: 'https://stony-su.itch.io/onyx',
