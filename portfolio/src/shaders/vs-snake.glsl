@@ -5,6 +5,7 @@ uniform sampler2D t_oPos;
 uniform sampler2D t_ooPos;
 uniform float uSnowflake;
 uniform float uStretch;
+uniform float uLineStrength;
 
 varying vec3 vNorm;
 varying vec2 vLookup;
@@ -29,7 +30,14 @@ void main(){
 
   vec3 z = vSpeed > 1e-8 ? normalize( d1 ) : vec3( 0.0, 0.0, 1.0 );
   vec3 xr = cross( z , normalize( d2 + vec3( 1e-7 ) ) );
-  vec3 x = length( xr ) > 1e-8 ? normalize( xr ) : vec3( 1.0, 0.0, 0.0 );
+  // In filament-line mode, near-straight motion makes this cross product
+  // degenerate and normalizing it amplifies float noise into per-particle
+  // random orientations (confetti normals along the lines) — so lines use a
+  // stable reference frame. Chaos mode keeps the noisy axes: their shimmer
+  // is what makes dense formations (DARREN) glow white-hot.
+  float axisThresh = mix( 1e-8, 1e-3, uLineStrength );
+  vec3 ref = abs( z.y ) < 0.95 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 );
+  vec3 x = length( xr ) > axisThresh ? normalize( xr ) : normalize( cross( z, ref ) );
   vec3 y = cross( z , x );
 
   mat3 rot = mat3(
@@ -37,6 +45,22 @@ void main(){
     y.x , y.y , y.z ,
     z.x , z.y , z.z
   );
+
+  // Filament-line rig: this legacy frame maps the feather's plane normal to
+  // the motion direction, so a chain cruising straight in the screen plane
+  // is seen edge-on — an invisible sliver. In line mode, point the length
+  // axis along the motion and turn the plane toward the camera instead.
+  if ( uLineStrength > 0.001 ) {
+    vec3 zc = vec3( 0.0, 0.0, 1.0 ) - z * z.z;
+    float zcl = length( zc );
+    vec3 zcam = zcl > 1e-4 ? zc / zcl : vec3( 0.0, 1.0, 0.0 );
+    vec3 xc = cross( z, zcam );
+    rot = mat3(
+      mix( x, xc, uLineStrength ),
+      mix( y, z, uLineStrength ),
+      mix( z, zcam, uLineStrength )
+    );
+  }
 
   // Blizzard: morph the feather into a 6-arm snowflake (blend, not branch)
   vec3 modifiedPos = position;
@@ -79,9 +103,18 @@ void main(){
   modifiedPos = mix(position, rotatedSnow, uSnowflake);
 
   // Velocity stretch: shear the feather's length axis into the motion axis
-  // so fast particles elongate along their path (disabled for snowflakes)
+  // so fast particles elongate along their path (disabled for snowflakes).
+  // The line rig already points the length axis along the motion, so there
+  // it elongates directly instead of shearing into the plane normal.
   float stretch = clamp(vSpeed * uStretch, 0.0, 1.2) * (1.0 - uSnowflake);
-  modifiedPos.z += modifiedPos.y * stretch;
+  modifiedPos.z += modifiedPos.y * stretch * (1.0 - uLineStrength);
+  modifiedPos.y *= 1.0 + stretch * 1.2 * uLineStrength;
+
+  // Near-camera boost: particles drifting toward the lens grow beyond raw
+  // perspective, reading as big soft foreground shapes "outside" the screen
+  vec4 soulMv = modelViewMatrix * vec4( iPos, 1.0 );
+  float prox = smoothstep(1.6, 0.5, -soulMv.z);
+  modifiedPos *= 1.0 + prox * 1.4;
 
   vNorm = rot * normal;
 

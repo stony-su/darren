@@ -30,20 +30,28 @@ export interface ShowOptions {
 export class ProjectSlideshow {
   private container: HTMLElement;
   private scene: ParticleScene;
+  private onIndexChange: ((index: number) => void) | null;
   private slideshowEl!: HTMLElement;
-  private railButtons: HTMLElement[] = [];
+  private viewAllBtn: HTMLElement | null = null;
   private gridOverlay: HTMLElement | null = null;
   private lastFocused: HTMLElement | null = null;
   private currentIndex = 0;
   private lastScrollLeft = 0;
   private scrollRafPending = false;
   private hashTimer: number | null = null;
+  private destroyed = false;
+  private ac = new AbortController();
   private boundKeyHandler: (e: KeyboardEvent) => void;
   private boundResizeHandler: () => void;
 
-  constructor(container: HTMLElement, scene: ParticleScene) {
+  constructor(
+    container: HTMLElement,
+    scene: ParticleScene,
+    onIndexChange?: (index: number) => void
+  ) {
     this.container = container;
     this.scene = scene;
+    this.onIndexChange = onIndexChange ?? null;
     this.boundKeyHandler = this.handleKey.bind(this);
     this.boundResizeHandler = this.handleResize.bind(this);
   }
@@ -67,7 +75,6 @@ export class ProjectSlideshow {
 
     this.container.appendChild(this.slideshowEl);
 
-    this.buildRail();
     this.buildViewAllButton();
 
     // Fade in (and jump to the deep-linked slide before the first paint)
@@ -90,13 +97,27 @@ export class ProjectSlideshow {
     this.setupScrollTracking();
     this.setupWheelRedirect();
     this.setupVideoScrubbers();
-    this.setupCaseStudies();
 
-    window.addEventListener('keydown', this.boundKeyHandler);
-    window.addEventListener('resize', this.boundResizeHandler);
+    window.addEventListener('keydown', this.boundKeyHandler, { signal: this.ac.signal });
+    window.addEventListener('resize', this.boundResizeHandler, { signal: this.ac.signal });
 
     // Watch performance once the steady-state view is up
     this.scene.startPerfWatch();
+  }
+
+  /** Tear down all DOM and listeners (used when replaying the intro). */
+  destroy(): void {
+    this.destroyed = true;
+    this.ac.abort();
+    if (this.hashTimer !== null) window.clearTimeout(this.hashTimer);
+    this.closeGrid();
+    this.slideshowEl?.remove();
+    this.viewAllBtn?.remove();
+    this.viewAllBtn = null;
+    this.scene.setCardRect(null);
+    this.scene.setLineMode(false);
+    this.scene.setAttract(false);
+    this.scene.setWind(0, 0, 0);
   }
 
   goTo(index: number): void {
@@ -146,15 +167,18 @@ export class ProjectSlideshow {
   }
 
   private onSlideChange(index: number): void {
+    if (this.destroyed) return;
     this.currentIndex = index;
     const isEdge = index === 0 || index === this.slideCount - 1;
 
     this.scene.setTheme(this.themeForSlide(index));
     this.scene.setAttract(isEdge);
+    // Project-card slides gather the field into curl filament lines
+    this.scene.setLineMode(!isEdge);
     const wind = isEdge ? [0, 0, 0] : WIND_TABLE[(index - 1) % WIND_TABLE.length];
     this.scene.setWind(wind[0], wind[1], wind[2]);
 
-    this.updateRail();
+    this.onIndexChange?.(index);
     this.updateCardRect();
 
     // Debounced hash update
@@ -243,37 +267,6 @@ export class ProjectSlideshow {
     }
   }
 
-  /* ── Progress rail ── */
-
-  private buildRail(): void {
-    const rail = document.createElement('nav');
-    rail.setAttribute('aria-label', 'Projects');
-    rail.className = 'progress-rail fixed bottom-6 left-1/2 z-20 flex items-end gap-3';
-    rail.style.transform = 'translateX(-50%)';
-
-    const names = ['Intro', ...PROJECTS.map((p) => p.title), 'Contact'];
-    names.forEach((name, i) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'rail-btn';
-      btn.setAttribute('aria-label', `Go to ${name}`);
-      btn.innerHTML = `<span class="rail-label font-body">${name}</span><span class="rail-dot"></span>`;
-      btn.addEventListener('click', () => this.goTo(i));
-      rail.appendChild(btn);
-      this.railButtons.push(btn);
-    });
-
-    this.container.appendChild(rail);
-    this.updateRail();
-  }
-
-  private updateRail(): void {
-    this.railButtons.forEach((btn, i) => {
-      btn.classList.toggle('active', i === this.currentIndex);
-      btn.setAttribute('aria-current', i === this.currentIndex ? 'true' : 'false');
-    });
-  }
-
   /* ── View-all grid overlay ── */
 
   private buildViewAllButton(): void {
@@ -285,6 +278,7 @@ export class ProjectSlideshow {
       'fixed bottom-6 left-6 z-20 px-4 py-2 rounded-full font-body text-xs tracking-widest uppercase text-slate-300 border border-slate-600 hover:bg-white/10 transition-colors';
     btn.addEventListener('click', () => this.openGrid());
     this.container.appendChild(btn);
+    this.viewAllBtn = btn;
   }
 
   private openGrid(): void {
@@ -388,32 +382,8 @@ export class ProjectSlideshow {
       <div class="flex gap-4 mt-8 flex-wrap">
         ${project.liveUrl ? `<a href="${project.liveUrl}" target="_blank" rel="noopener" class="px-6 py-2.5 rounded-full text-sm font-body font-medium text-white ${css.buttonClass} transition-colors">View Live</a>` : ''}
         ${project.repoUrl ? `<a href="${project.repoUrl}" target="_blank" rel="noopener" class="px-6 py-2.5 rounded-full text-sm font-body font-medium ${css.textClass} border ${css.borderClass} hover:bg-white/5 transition-colors">Source</a>` : ''}
-        ${project.caseStudy ? `
-        <button type="button" class="case-study-toggle px-6 py-2.5 rounded-full text-sm font-body font-medium ${css.textClass} border ${css.borderClass} hover:bg-white/5 transition-colors" aria-expanded="false">
-          Case study <span class="case-study-chevron inline-block transition-transform" aria-hidden="true">▾</span>
-        </button>` : ''}
       </div>
     `;
-
-    const caseStudyHtml = project.caseStudy
-      ? `
-      <div class="case-study-panel" hidden>
-        <div class="pt-6 mt-6 border-t ${css.borderClass} space-y-4">
-          <div>
-            <h4 class="font-body text-xs tracking-widest uppercase ${css.textClass} opacity-60 mb-1">What I built</h4>
-            <p class="font-body text-sm text-slate-400 leading-relaxed">${project.caseStudy.built}</p>
-          </div>
-          <div>
-            <h4 class="font-body text-xs tracking-widest uppercase ${css.textClass} opacity-60 mb-1">What was hard</h4>
-            <p class="font-body text-sm text-slate-400 leading-relaxed">${project.caseStudy.challenge}</p>
-          </div>
-          <div>
-            <h4 class="font-body text-xs tracking-widest uppercase ${css.textClass} opacity-60 mb-1">Outcome</h4>
-            <p class="font-body text-sm text-slate-400 leading-relaxed">${project.caseStudy.outcome}</p>
-          </div>
-        </div>
-      </div>`
-      : '';
 
     // Alternate card layout: even = image left, odd = image right
     const isEven = index % 2 === 0;
@@ -421,10 +391,10 @@ export class ProjectSlideshow {
     const textOrder = isEven ? 'order-2' : 'order-2 lg:order-1';
 
     slide.innerHTML = `
-      <div class="project-card w-full max-w-5xl backdrop-blur-md bg-white/[0.04] border ${css.borderClass} rounded-3xl overflow-hidden shadow-2xl">
+      <div class="project-card w-full max-w-5xl backdrop-blur-md bg-black/30 border ${css.borderClass} rounded-3xl overflow-hidden shadow-2xl">
         <div class="flex flex-col lg:flex-row">
           <div class="${imageOrder} lg:w-1/2">
-            <div class="aspect-video lg:aspect-auto lg:h-full overflow-hidden relative">
+            <div class="aspect-video lg:aspect-auto lg:h-full max-h-[58dvh] overflow-hidden relative">
               ${this.createMediaHtml(project)}
             </div>
           </div>
@@ -437,35 +407,12 @@ export class ProjectSlideshow {
             <p class="font-body text-base md:text-lg text-slate-400 leading-relaxed mb-6">${project.description}</p>
             <div class="flex flex-wrap gap-2 mb-2">${tagsHtml}</div>
             ${linksHtml}
-            ${caseStudyHtml}
           </div>
         </div>
       </div>
     `;
 
     return slide;
-  }
-
-  private setupCaseStudies(): void {
-    const toggles = this.slideshowEl.querySelectorAll<HTMLButtonElement>('.case-study-toggle');
-    toggles.forEach((toggle) => {
-      toggle.addEventListener('click', () => {
-        const card = toggle.closest('.project-card') as HTMLElement | null;
-        const panel = card?.querySelector<HTMLElement>('.case-study-panel');
-        const chevron = toggle.querySelector<HTMLElement>('.case-study-chevron');
-        if (!panel || !card) return;
-
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!expanded));
-        panel.hidden = expanded;
-        if (chevron) chevron.style.transform = expanded ? '' : 'rotate(180deg)';
-        // Tall content scrolls inside the card instead of overflowing the slide
-        card.classList.toggle('max-h-[86dvh]', !expanded);
-        card.classList.toggle('overflow-y-auto', !expanded);
-        // Card size changed — refresh the particle deflection rect
-        requestAnimationFrame(() => this.updateCardRect());
-      });
-    });
   }
 
   private createMediaHtml(project: Project): string {
@@ -536,10 +483,10 @@ export class ProjectSlideshow {
         seek(e.touches[0]);
       }, { passive: true });
 
-      window.addEventListener('mousemove', (e) => { if (isDragging) seek(e); });
-      window.addEventListener('touchmove', (e) => { if (isDragging) seek(e.touches[0]); }, { passive: true });
-      window.addEventListener('mouseup', () => { isDragging = false; });
-      window.addEventListener('touchend', () => { isDragging = false; });
+      window.addEventListener('mousemove', (e) => { if (isDragging) seek(e); }, { signal: this.ac.signal });
+      window.addEventListener('touchmove', (e) => { if (isDragging) seek(e.touches[0]); }, { passive: true, signal: this.ac.signal });
+      window.addEventListener('mouseup', () => { isDragging = false; }, { signal: this.ac.signal });
+      window.addEventListener('touchend', () => { isDragging = false; }, { signal: this.ac.signal });
     });
   }
 

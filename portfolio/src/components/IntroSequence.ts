@@ -17,6 +17,8 @@ interface StickerConfig {
 
 interface IntroLine {
   text: string;
+  /** Short name shown in the bottom timeline. */
+  railLabel: string;
   /** When set, the particle field forms this word while the line is active. */
   particleText?: string;
   /** Vertical offset for the DOM text (to clear the particle-formed word). */
@@ -55,6 +57,7 @@ const HOCKEY_STICKERS: StickerConfig[] = [
 const INTRO_LINES: IntroLine[] = [
   {
     text: "Hi! I'm",
+    railLabel: 'Darren',
     particleText: 'DARREN',
     offsetY: '-16vh',
     theme: 0,
@@ -64,6 +67,7 @@ const INTRO_LINES: IntroLine[] = [
   },
   {
     text: 'I code websites :D',
+    railLabel: 'Websites',
     theme: 1,
     className: 'intro-line-letter',
     fontStyle: 'body',
@@ -71,6 +75,7 @@ const INTRO_LINES: IntroLine[] = [
   },
   {
     text: "And when I'm not, you can find me reading…",
+    railLabel: 'Reading',
     theme: 2,
     className: 'intro-line-scale',
     fontStyle: 'body',
@@ -78,6 +83,7 @@ const INTRO_LINES: IntroLine[] = [
   },
   {
     text: 'Or playing hockey!',
+    railLabel: 'Hockey',
     theme: 3,
     className: 'intro-line-slide',
     fontStyle: 'body',
@@ -85,12 +91,16 @@ const INTRO_LINES: IntroLine[] = [
   },
   {
     text: "And I'd like to work with you",
+    railLabel: 'Together',
     theme: 4,
     className: 'intro-line-blur',
     fontStyle: 'display',
     stickers: [],
   },
 ];
+
+/** Timeline labels for the intro portion of the shared progress rail. */
+export const INTRO_RAIL_LABELS: string[] = INTRO_LINES.map((l) => l.railLabel);
 
 /* ── Timing ── */
 
@@ -111,17 +121,26 @@ export class IntroSequence {
   private activeIndex = -1;
   private completed = false;
   private boundScrollHandler: () => void;
+  private onLineChange: ((index: number) => void) | null;
 
-  constructor(container: HTMLElement, scene: ParticleScene, onComplete: () => void) {
+  constructor(
+    container: HTMLElement,
+    scene: ParticleScene,
+    onComplete: () => void,
+    onLineChange?: (index: number) => void
+  ) {
     this.container = container;
     this.scene = scene;
     this.onComplete = onComplete;
+    this.onLineChange = onLineChange ?? null;
     this.boundScrollHandler = this.handleScroll.bind(this);
   }
 
   /* ── Public ── */
 
-  start(): void {
+  start(opts: { startLine?: number; immediate?: boolean } = {}): void {
+    const startLine = Math.max(0, Math.min(INTRO_LINES.length - 1, opts.startLine ?? 0));
+    const immediate = opts.immediate ?? false;
     /* Enable scrolling on body for the intro */
     document.body.style.overflow = 'auto';
     document.body.style.overflowX = 'hidden';
@@ -248,17 +267,46 @@ export class IntroSequence {
 
     this.applySizing();
 
+    if (immediate || startLine > 0) {
+      /* Replay / deep entry: particles are already spread — land directly */
+      window.scrollTo({ top: startLine * window.innerHeight, behavior: 'auto' });
+      this.showLine(startLine);
+      window.addEventListener('scroll', this.boundScrollHandler, { passive: true });
+      return;
+    }
+
     /* Begin forming DARREN slightly before the first line lands */
     setTimeout(() => {
       if (!this.completed) this.scene.setTextFormation(true);
     }, Math.max(0, FANOUT_DURATION - 700));
 
-    /* Show the first line after the fanout, then listen to scroll */
+    /* Show the current line after the fanout, then listen to scroll.
+       (A timeline click may already have scrolled past line 0.) */
     setTimeout(() => {
       if (this.completed) return;
-      this.showLine(0);
+      const line = Math.min(
+        Math.floor(window.scrollY / window.innerHeight),
+        INTRO_LINES.length - 1
+      );
+      this.showLine(Math.max(0, line));
       window.addEventListener('scroll', this.boundScrollHandler, { passive: true });
     }, FANOUT_DURATION);
+  }
+
+  /** Timeline navigation: scroll the intro to a given line. */
+  goToLine(index: number): void {
+    if (this.completed) return;
+    const clamped = Math.max(0, Math.min(INTRO_LINES.length - 1, index));
+    // Long jumps land instantly (smooth-scrolling through several viewport
+    // heights flashes every line in between).
+    const behavior: ScrollBehavior =
+      Math.abs(clamped - Math.max(0, this.activeIndex)) > 1 ? 'auto' : 'smooth';
+    window.scrollTo({ top: clamped * window.innerHeight, behavior });
+  }
+
+  /** Skip the rest of the intro (used by the timeline's slide dots). */
+  finish(): void {
+    this.completeIntro();
   }
 
   /* ── Sizing per line ── */
@@ -308,6 +356,7 @@ export class IntroSequence {
     const el = this.lineElements[index];
     const sc = this.stickerContainers[index];
 
+    this.onLineChange?.(index);
     this.scene.setTheme(line.theme);
 
     if (line.particleText !== undefined) {

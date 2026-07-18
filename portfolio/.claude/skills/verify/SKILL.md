@@ -33,9 +33,16 @@ npm run dev            # http://localhost:5173 (run in background)
 - Skip button ("Skip intro") top-right; sessionStorage `introSeen` auto-skips.
 - Slideshow: ArrowLeft/Right/Home/End; hash per slide (#vertex … #contact);
   deep link (e.g. `/#turntable`) must skip the intro entirely.
-- Rail dots (`.rail-btn`), "All projects" grid overlay (Escape closes),
-  case-study expand (`.case-study-toggle`), playground gear (`.pg-gear`,
+- Timeline (`nav.progress-rail`): 13 dots = 5 intro steps + Work + 6 projects
+  + Contact, evenly spread with a `.rail-progress` fill line. Visible during
+  BOTH intro and slideshow. Intro dots (`.rail-btn-intro`) navigate intro
+  lines / replay the intro from the slideshow; slide dots jump slides.
+- "All projects" grid overlay (Escape closes), playground gear (`.pg-gear`,
   sliders `#pg-speed` etc., count select `#pg-count` triggers a live rebuild).
+- Filament mode: project-card slides gather particles into long thin curl
+  lines (lineStrength ramps ~1s); Work/Contact slides dissolve back to chaos.
+- Foreground drift: sparse bokeh streamlets on a 2D canvas (z-15) cross over
+  the card every ~10-18s; absent under reduced motion.
 - Reduced motion: context `reducedMotion: 'reduce'` → straight to slideshow.
 - Console must stay clean except: aborted font requests (driver-induced) and
   a `THREE.Clock` deprecation warning (known, cosmetic).

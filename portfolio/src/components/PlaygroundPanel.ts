@@ -59,6 +59,14 @@ export class PlaygroundPanel {
     this.applyAll();
   }
 
+  destroy(): void {
+    this.gear?.remove();
+    this.gear = null;
+    this.panel?.remove();
+    this.panel = null;
+    this.open = false;
+  }
+
   private toggle(): void {
     this.open = !this.open;
     if (this.panel) this.panel.hidden = !this.open;

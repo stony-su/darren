@@ -69,6 +69,10 @@ export class ParticleScene {
   // Card deflection
   private cardStrengthTarget = 0;
 
+  // Filament-line mode (project-card slides)
+  private lineTarget = 0;
+  private simTime = 0;
+
   // Text formation
   private textTexture: THREE.DataTexture | null = null;
   private textPromise: Promise<void> | null = null;
@@ -135,6 +139,8 @@ export class ParticleScene {
       cardStrength: { value: 0.0 },
       windDir: { value: new THREE.Vector3(0, 0, 0) },
       burstStrength: { value: 0.0 },
+      uTime: { value: 0.0 },
+      lineStrength: { value: 0.0 },
     };
 
     const theme0 = THEMES[0];
@@ -152,6 +158,8 @@ export class ParticleScene {
       uFogColor: { value: new THREE.Vector3(...this.bgSrgbA) },
       uFogNear: { value: 2.3 },
       uFogFar: { value: 3.0 },
+      // Shared object with the sim uniform — one value drives both shaders
+      uLineStrength: this.soulUniforms.lineStrength,
     };
 
     this.tier = pickTier();
@@ -199,6 +207,10 @@ export class ParticleScene {
       this.textTexture?.dispose();
       this.textTexture = null;
       this.initTextTargets(text);
+    } else {
+      // Mid-browse rebuilds (perf downgrade, count change) must not collapse
+      // the field to the center — it hides behind the card for seconds.
+      this.seedSpread();
     }
   }
 
@@ -372,6 +384,16 @@ export class ParticleScene {
     this.windTarget.set(x, y, z);
   }
 
+  /** Gather the field into curl filament lines (project-card slides). */
+  setLineMode(on: boolean): void {
+    if (on && this.lineTarget === 0) {
+      // Chains assembling at speed leave bright smears; keep trails flushed
+      // until the lines have mostly formed.
+      this.post.kickDamp(0.5, 2500);
+    }
+    this.lineTarget = on ? 1 : 0;
+  }
+
   /** Momentary gust (e.g. from slideshow scroll velocity). Decays automatically. */
   addGust(x: number, y = 0): void {
     this.gust.x = THREE.MathUtils.clamp(this.gust.x + x, -3, 3);
@@ -409,6 +431,29 @@ export class ParticleScene {
     this.curl.soul.resetRand(0.01);
   }
 
+  /** Seed the field already spread out — for boots that skip the intro's
+   *  center fan-out (deep links, revisits), so particles don't spend their
+   *  first seconds hidden behind the project card. Mostly seeded behind the
+   *  card plane: near-camera density washes the card out through its blur. */
+  seedSpread(): void {
+    const soul = this.curl.soul;
+    const data = new Float32Array(soul.s2 * 4);
+    for (let i = 0; i < soul.s2; i++) {
+      // Fixed world extent, larger than the widest frustum: a narrow
+      // viewport sees a slice, keeping on-screen density consistent.
+      data[i * 4] = (Math.random() - 0.5) * 4.8;
+      data[i * 4 + 1] = (Math.random() - 0.5) * 3.0;
+      data[i * 4 + 2] = -1.0 + Math.random() * 1.3;
+      data[i * 4 + 3] = 0;
+    }
+    const tex = new THREE.DataTexture(data, soul.size, soul.size, THREE.RGBAFormat, THREE.FloatType);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    soul.reset(tex);
+    tex.dispose();
+  }
+
   /* ── Perf watch ── */
 
   /** Start sampling frame times; downgrade one tier if the device struggles.
@@ -439,6 +484,15 @@ export class ParticleScene {
 
       const dT = this.clock.getDelta();
       this.soulUniforms.dT.value = dT * this.speedMultiplier;
+      // Sim clock scales with the speed multiplier so floater oscillation
+      // paces with the rest of the field
+      this.simTime += dT * this.speedMultiplier;
+      this.soulUniforms.uTime.value = this.simTime;
+
+      // Filament-line mode ramps in/out over ~1s
+      const ls = this.soulUniforms.lineStrength.value as number;
+      this.soulUniforms.lineStrength.value =
+        ls + (this.lineTarget - ls) * Math.min(1, dT * 1.1);
 
       this.frameMonitor?.tick(dT);
 

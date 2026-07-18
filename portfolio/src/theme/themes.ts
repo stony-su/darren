@@ -90,7 +90,7 @@ export const THEMES: ThemeDef[] = [
     normalMode: false,
     fx: { glow: 0.33, sparkle: 0.0, tScale: [4.0, 2.5] },
     snowflake: 0,
-    bloom: { strength: 0.35, radius: 0.4, threshold: 0.5 },
+    bloom: { strength: 0.3, radius: 0.4, threshold: 0.55 },
     afterimageDamp: 0.75,
     css: {
       accent: '#6ee7b7',
@@ -115,7 +115,7 @@ export const THEMES: ThemeDef[] = [
     normalMode: false,
     fx: { glow: 0.55, sparkle: 0.0, tScale: [3.5, 2.0] },
     snowflake: 0,
-    bloom: { strength: 0.45, radius: 0.5, threshold: 0.35 },
+    bloom: { strength: 0.4, radius: 0.5, threshold: 0.4 },
     afterimageDamp: 0.75,
     css: {
       accent: '#a5f3fc',

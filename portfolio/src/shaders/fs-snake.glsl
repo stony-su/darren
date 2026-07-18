@@ -15,6 +15,7 @@ uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform float uSpeedGlow;
+uniform float uLineStrength;
 
 vec3 gradientColor(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec3 p4, vec4 fx, float normalFlag) {
   float t = fract(vLookup.x * fx.z + vLookup.y * fx.w);
@@ -35,11 +36,16 @@ void main() {
   vec3 colB = gradientColor(uPaletteB[0], uPaletteB[1], uPaletteB[2], uPaletteB[3], uPaletteB[4], uFxB, uNormalB);
   vec3 col = mix(colA, colB, uBlend);
 
-  // Velocity glow: fast particles brighten
-  col *= 1.0 + clamp(vSpeed * uSpeedGlow, 0.0, 0.45);
+  // Velocity glow: fast particles brighten (capped harder in line mode —
+  // chains assembling at speed otherwise storm into a whiteout)
+  col *= 1.0 + clamp(vSpeed * uSpeedGlow, 0.0, mix(0.45, 0.18, uLineStrength));
 
   // Depth fade: dissolve distant particles into the background
   col = mix(col, uFogColor, smoothstep(uFogNear, uFogFar, vViewZ));
+
+  // Near fade: particles looming toward the camera dissolve into the
+  // background before reaching the near plane, so they never pop or clip
+  col = mix(uFogColor, col, smoothstep(0.5, 1.15, vViewZ));
 
 #ifdef USE_LINEAR_OUT
   // Colors are authored in sRGB; when the post pipeline (OutputPass) is active

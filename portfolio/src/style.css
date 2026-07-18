@@ -224,29 +224,70 @@ body {
   outline-offset: 2px;
 }
 
-/* ── Progress rail ── */
+/* ── Progress timeline (intro steps + slides, one connected rail) ── */
 .progress-rail {
   pointer-events: auto;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 200px));
+  z-index: 20;
+}
+
+.rail-track,
+.rail-progress {
+  position: absolute;
+  top: 9px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.rail-track {
+  left: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.rail-progress {
+  left: 10px;
+  width: calc((100% - 20px) * var(--rail-frac, 0));
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1), background 0.5s ease;
+}
+
+.rail-row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
 }
 
 .rail-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   background: none;
   border: none;
-  padding: 6px 2px;
   cursor: pointer;
 }
 
 .rail-dot {
-  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
-  transition: background 0.3s ease, transform 0.3s ease;
+  transform: translate(-50%, -50%);
+  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.rail-btn-intro .rail-dot {
+  width: 6px;
+  height: 6px;
 }
 
 .rail-btn:hover .rail-dot,
@@ -254,18 +295,28 @@ body {
   background: rgba(255, 255, 255, 0.7);
 }
 
+/* Dots behind the active one read as visited */
+.rail-btn.passed .rail-dot {
+  background: color-mix(in srgb, var(--accent) 60%, rgba(255, 255, 255, 0.1));
+}
+
 .rail-btn.active .rail-dot {
   background: var(--accent);
-  transform: scale(1.35);
+  transform: translate(-50%, -50%) scale(1.5);
+  box-shadow: 0 0 10px var(--accent);
 }
 
 .rail-label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 6px;
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.8);
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateX(-50%) translateY(4px);
   transition: opacity 0.25s ease, transform 0.25s ease;
   white-space: nowrap;
   pointer-events: none;
@@ -275,7 +326,29 @@ body {
 .rail-btn:focus-visible .rail-label,
 .rail-btn.active .rail-label {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Narrow screens: rise above the corner buttons and tighten the dots */
+@media (max-width: 720px) {
+  .progress-rail {
+    bottom: 72px;
+    width: calc(100vw - 48px);
+  }
+
+  .rail-btn {
+    width: 14px;
+  }
+
+  .rail-track {
+    left: 7px;
+    right: 7px;
+  }
+
+  .rail-progress {
+    left: 7px;
+    width: calc((100% - 14px) * var(--rail-frac, 0));
+  }
 }
 
 /* ── Playground panel ── */
