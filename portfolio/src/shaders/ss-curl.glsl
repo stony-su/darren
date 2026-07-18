@@ -8,6 +8,17 @@ uniform vec3  mousePos;
 uniform float mouseForce;
 uniform vec2  resolution;
 
+uniform sampler2D t_target;
+uniform float targetStrength;
+
+uniform vec3  cardCenter;
+uniform vec2  cardHalfSize;
+uniform float cardRadius;
+uniform float cardStrength;
+
+uniform vec3  windDir;
+uniform float burstStrength;
+
 varying vec2 vUv;
 
 // -- simplex noise chunk --
@@ -34,21 +45,72 @@ void main(){
   vec3 curl = curlNoise( pos.xyz * noiseSize );
   vel += curl * .0001 * timeScale;
 
-  // Center exclusion zone — particles physically repelled from origin
+  // Ambient wind drift (per-slide direction + scroll gusts)
+  vel += windDir * 0.00012 * timeScale;
+
+  // Text-formation lookup (needed by the exclusion logic below):
+  // only ~55% of particles join the formation; the rest keep flowing so the
+  // release never dumps the whole population in one burst.
+  vec4 tgt = vec4(0.0);
+  float participate = 0.0;
+  float arrive = 0.0;
+  if (targetStrength > 0.001) {
+    tgt = texture2D(t_target, uv);
+    participate = step(tgt.w, 0.45);
+    arrive = clamp(targetStrength * 1.6 - fract(tgt.w * 7.0) * 0.5, 0.0, 1.0) * participate;
+  }
+
+  // Center exclusion zone — particles physically repelled from origin.
+  // Formation members ignore it (the letters live near the center).
   vec3 toCenter = pos.xyz;
   float dist = length(toCenter);
   if (dist > 0.001) {
-    float repel = smoothstep(exclusionRadius, 0.0, dist);
+    float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive);
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
-  // Mouse attraction
+  // While the text holds, non-participants drift behind the text plane and
+  // into the depth fade, leaving the word crisp against a soft mist.
+  float freeAgent = targetStrength * (1.0 - participate);
+  if (freeAgent > 0.001) {
+    float ahead = smoothstep(-0.8, 0.2, pos.z);
+    vel += vec3(0.0, 0.0, -0.0012) * ahead * freeAgent * timeScale;
+  }
+
+  // Mouse attraction / repulsion (sign of mouseForce)
   if (mouseForce != 0.0) {
     vec3 toMouse = mousePos - pos.xyz;
     float mDist = length(toMouse);
     float influence = 1.0 / (1.0 + mDist * mDist * 8.0);
     vec3 mouseDir = normalize(toMouse);
     vel += mouseDir * mouseForce * influence * 0.0045 * timeScale;
+  }
+
+  // Rounded-box deflection around the visible project card (z-masked so
+  // deep particles drift behind it instead of bouncing off).
+  if (cardStrength > 0.001) {
+    vec2 rel = pos.xy - cardCenter.xy;
+    vec2 q = abs(rel) - (cardHalfSize - vec2(cardRadius));
+    float sd = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - cardRadius;
+    float zMask = smoothstep(0.7, 0.15, abs(pos.z - cardCenter.z));
+    float deflect = smoothstep(0.18, -0.05, sd) * cardStrength * zMask;
+    vel += normalize(vec3(rel, 0.0) + vec3(0.0, 0.0, 1e-5)) * deflect * 0.0009 * timeScale;
+  }
+
+  // Text-formation target attraction: spring toward per-particle target,
+  // staggered by the target texel's random w, with settle damping so the
+  // letters hold still once formed.
+  if (arrive > 0.001) {
+    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * timeScale;
+    vel *= mix(1.0, pow(0.80, timeScale), arrive * 0.9);
+  }
+
+  // Release burst: scatter + recede into depth so a held formation dissolves
+  // into the fog instead of flaring across the screen
+  // (fired when text formation lets go, decays scene-side in ~1s)
+  if (burstStrength > 0.001) {
+    vec3 scatter = curlNoise(pos.xyz * (noiseSize * 2.5) + vec3(37.7, 17.3, 91.1));
+    vel += (scatter * 0.001 + vec3(0.0, 0.0, -0.002)) * burstStrength * timeScale;
   }
 
   vel *= pow(.97, timeScale); // dampening

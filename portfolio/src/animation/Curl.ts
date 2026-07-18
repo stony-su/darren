@@ -11,6 +11,7 @@ export interface CurlParams {
   simulationShader: string;
   bodyUniforms: Record<string, THREE.IUniform>;
   soulUniforms: Record<string, THREE.IUniform>;
+  defines?: Record<string, string>;
 }
 
 /**
@@ -63,7 +64,7 @@ export class Curl {
       bodyUniforms,
       params.vertexShader,
       params.fragmentShader,
-      { side: THREE.DoubleSide }
+      { side: THREE.DoubleSide, defines: params.defines }
     );
 
     this.body.frustumCulled = false;
