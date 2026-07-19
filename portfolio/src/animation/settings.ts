@@ -1,10 +1,12 @@
 export type MouseMode = 'auto' | 'off' | 'attract' | 'repel';
+export type LineMode = 'auto' | 'on' | 'off';
 
 export interface PlaygroundSettings {
   speed: number;                // sim speed multiplier
   noiseSize: number;            // curl noise scale
   mouseMode: MouseMode;         // 'auto' = slideshow decides
   mouseStrength: number;        // attract/repel force multiplier
+  lineMode: LineMode;           // swirl filament lines; 'auto' = slideshow decides
   trailOverride: number | null; // afterimage damp; null = per-theme default
   bloomMult: number;            // multiplies per-theme bloom strength
   count: number | null;         // particle count; null = auto device tier
@@ -15,6 +17,7 @@ export const DEFAULT_SETTINGS: PlaygroundSettings = {
   noiseSize: 1.5,
   mouseMode: 'auto',
   mouseStrength: 1,
+  lineMode: 'auto',
   trailOverride: null,
   bloomMult: 1,
   count: null,

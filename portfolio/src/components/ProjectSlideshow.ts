@@ -272,10 +272,12 @@ export class ProjectSlideshow {
   private buildViewAllButton(): void {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = 'All projects';
     btn.setAttribute('aria-label', 'View all projects');
-    btn.className =
-      'fixed bottom-6 left-6 z-20 px-4 py-2 rounded-full font-body text-xs tracking-widest uppercase text-slate-300 border border-slate-600 hover:bg-white/10 transition-colors';
+    btn.className = 'view-all-btn fixed bottom-6 left-6 z-20 font-body';
+    btn.innerHTML = `
+      <span class="va-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>All projects</span>
+    `;
     btn.addEventListener('click', () => this.openGrid());
     this.container.appendChild(btn);
     this.viewAllBtn = btn;
@@ -290,16 +292,24 @@ export class ProjectSlideshow {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'All projects');
     overlay.className =
-      'fixed inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md p-8 overflow-y-auto';
+      'grid-overlay fixed inset-0 z-30 flex flex-col items-center justify-center p-8 overflow-y-auto';
 
     const close = document.createElement('button');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close project grid');
     close.textContent = '✕';
     close.className =
-      'fixed top-5 right-5 w-10 h-10 rounded-full text-slate-200 border border-slate-600 hover:bg-white/10 transition-colors';
+      'grid-close fixed top-5 right-5 w-10 h-10 rounded-full text-slate-200 border border-slate-600';
     close.addEventListener('click', () => this.closeGrid());
     overlay.appendChild(close);
+
+    const head = document.createElement('div');
+    head.className = 'grid-head w-full max-w-4xl flex items-end justify-between gap-4 mb-6';
+    head.innerHTML = `
+      <h2 class="font-display italic text-4xl md:text-5xl text-slate-100">All Projects</h2>
+      <span class="font-body text-xs tracking-widest uppercase text-slate-400 pb-2">${PROJECTS.length} projects</span>
+    `;
+    overlay.appendChild(head);
 
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl w-full';
@@ -308,14 +318,16 @@ export class ProjectSlideshow {
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className =
-        'group relative rounded-2xl overflow-hidden border border-white/10 hover:border-white/40 transition-colors aspect-video text-left';
+        'grid-tile relative rounded-2xl overflow-hidden border border-white/10 aspect-video text-left' +
+        (i + 1 === this.currentIndex ? ' current' : '');
+      tile.style.setProperty('--i', String(i));
       tile.setAttribute('aria-label', `Go to ${p.title}`);
       const media = p.image
-        ? `<img src="${p.image}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />`
+        ? `<img src="${p.image}" alt="" class="absolute inset-0 w-full h-full object-cover" />`
         : `<div class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900"></div>`;
       tile.innerHTML = `
         ${media}
-        <span class="absolute bottom-0 left-0 right-0 p-3 font-body text-sm text-white bg-gradient-to-t from-black/70 to-transparent">${p.title}</span>
+        <span class="grid-tile-caption font-body"><em class="font-display italic">0${i + 1}</em>${p.title}</span>
       `;
       tile.addEventListener('click', () => {
         this.closeGrid();
@@ -325,16 +337,29 @@ export class ProjectSlideshow {
     });
 
     overlay.appendChild(grid);
+    // Clicking the dim backdrop (not a tile) closes, like Escape
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeGrid();
+    });
     this.container.appendChild(overlay);
     this.gridOverlay = overlay;
+
+    // Two frames so the closed state paints before the transition starts
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => overlay.classList.add('open'));
+    });
 
     const firstTile = grid.querySelector<HTMLElement>('button');
     firstTile?.focus();
   }
 
   private closeGrid(): void {
-    this.gridOverlay?.remove();
+    const overlay = this.gridOverlay;
+    if (!overlay) return;
     this.gridOverlay = null;
+    overlay.classList.remove('open');
+    overlay.style.pointerEvents = 'none';
+    window.setTimeout(() => overlay.remove(), 350);
     this.lastFocused?.focus();
     this.lastFocused = null;
   }

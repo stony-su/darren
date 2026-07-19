@@ -351,25 +351,344 @@ body {
   }
 }
 
-/* ── Playground panel ── */
-.pg-panel {
-  width: 250px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: rgba(10, 10, 20, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--accent-border);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  transition: border-color 0.5s ease;
+/* ── "All projects" button ── */
+.view-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(203, 213, 225);
+  background: rgba(10, 10, 20, 0.35);
+  border: 1px solid rgb(71, 85, 105);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease;
 }
 
-.pg-title {
-  margin: 0 0 12px;
+.view-all-btn:hover,
+.view-all-btn:focus-visible {
+  transform: translateY(-2px);
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: rgba(10, 10, 20, 0.55);
+  box-shadow: var(--glow-shadow);
+}
+
+.view-all-btn:active {
+  transform: translateY(0) scale(0.96);
+  transition-duration: 0.1s;
+}
+
+/* 2×2 dots icon; dots spread apart on hover like a grid expanding */
+.va-icon {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  transition: gap 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.va-icon i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: background 0.3s ease;
+}
+
+.view-all-btn:hover .va-icon,
+.view-all-btn:focus-visible .va-icon {
+  gap: 4px;
+}
+
+/* ── All-projects overlay ── */
+.grid-overlay {
+  background: radial-gradient(ellipse at center, rgba(8, 8, 16, 0.55) 0%, rgba(4, 4, 10, 0.82) 100%);
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  transition: opacity 0.35s ease, backdrop-filter 0.35s ease, -webkit-backdrop-filter 0.35s ease;
+}
+
+.grid-overlay.open {
+  opacity: 1;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.grid-head {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+
+.grid-overlay.open .grid-head {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.grid-close {
+  opacity: 0;
+  transform: rotate(-45deg);
+  transition:
+    opacity 0.4s ease 0.25s,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s,
+    background 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+  cursor: pointer;
+}
+
+.grid-overlay.open .grid-close {
+  opacity: 1;
+  transform: rotate(0deg);
+}
+
+.grid-close:hover,
+.grid-close:focus-visible {
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.08);
+  transition-delay: 0s;
+}
+
+/* Tiles cascade in, staggered by --i */
+.grid-tile {
+  opacity: 0;
+  transform: translateY(26px) scale(0.96);
+  transition:
+    opacity 0.5s ease calc(var(--i, 0) * 65ms + 0.15s),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 65ms + 0.15s),
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.grid-overlay.open .grid-tile {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.grid-tile img,
+.grid-tile > div {
+  opacity: 0.72;
+  transition: opacity 0.4s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grid-tile:hover,
+.grid-tile:focus-visible {
+  border-color: var(--accent-border);
+  box-shadow: var(--glow-shadow);
+  /* hover motion must not fight the staggered entrance */
+  transition-delay: 0s;
+}
+
+.grid-tile:hover img,
+.grid-tile:focus-visible img {
+  opacity: 1;
+  transform: scale(1.06);
+}
+
+.grid-tile:active img {
+  transform: scale(1.02);
+  transition-duration: 0.15s;
+}
+
+/* Marks the slide currently open behind the overlay */
+.grid-tile.current {
+  border-color: var(--accent-border);
+}
+
+.grid-tile-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 22px 14px 10px;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  transform: translateY(4px);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.grid-tile-caption em {
   font-size: 0.7rem;
-  letter-spacing: 0.15em;
+  color: var(--accent);
+}
+
+.grid-tile:hover .grid-tile-caption,
+.grid-tile:focus-visible .grid-tile-caption {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-all-btn,
+  .va-icon,
+  .grid-overlay,
+  .grid-head,
+  .grid-close,
+  .grid-tile,
+  .grid-tile img,
+  .grid-tile-caption,
+  .pg-gear,
+  .pg-panel,
+  .pg-panel .pg-head,
+  .pg-panel .pg-sub,
+  .pg-panel .pg-section,
+  .pg-panel .pg-footer {
+    transition-duration: 0.01s;
+    transition-delay: 0s;
+  }
+}
+
+/* ── Playground sidebar ── */
+.pg-gear {
+  cursor: pointer;
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s ease,
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+.pg-gear:hover,
+.pg-gear:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pg-gear.open {
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.pg-panel {
+  width: min(340px, 88vw);
+  height: 100vh;
+  height: 100dvh;
+  padding: 28px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  background: linear-gradient(to left, rgba(8, 8, 18, 0.92), rgba(10, 10, 22, 0.78));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid var(--accent-border);
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+  transform: translateX(calc(100% + 40px));
+  visibility: hidden;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.5s ease,
+    visibility 0s linear 0.5s;
+}
+
+.pg-panel.open {
+  transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.5s ease;
+}
+
+/* Content drifts in a beat behind the sheet, staggered per section */
+.pg-panel .pg-head,
+.pg-panel .pg-sub,
+.pg-panel .pg-section,
+.pg-panel .pg-footer {
+  opacity: 0;
+  transform: translateX(28px);
+  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pg-panel.open .pg-head,
+.pg-panel.open .pg-sub,
+.pg-panel.open .pg-section,
+.pg-panel.open .pg-footer {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(0.12s + var(--s, 0) * 70ms);
+}
+
+.pg-panel.open .pg-head,
+.pg-panel.open .pg-sub {
+  transition-delay: 0.08s;
+}
+
+.pg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.pg-heading {
+  margin: 0;
+  font-size: 1.7rem;
+  color: rgb(241, 245, 249);
+}
+
+.pg-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s ease, border-color 0.25s ease;
+}
+
+.pg-close:hover,
+.pg-close:focus-visible {
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.pg-sub {
+  margin: 0 0 22px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.pg-section {
+  padding: 16px 0 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pg-section-title {
+  margin: 0 0 14px;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.pg-footer {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .pg-row {
@@ -383,9 +702,14 @@ body {
 .pg-row label,
 .pg-row > span {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.85);
   margin-bottom: 6px;
+}
+
+.pg-row input[type='range'] {
+  height: 4px;
+  border-radius: 2px;
 }
 
 .pg-row-inline {
@@ -425,11 +749,17 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
-.pg-btn:hover {
+.pg-btn:hover,
+.pg-btn:focus-visible {
   background: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent-border);
+}
+
+.pg-btn:active {
+  transform: scale(0.95);
 }
 
 .pg-btn-small {

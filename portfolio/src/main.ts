@@ -4,7 +4,6 @@ import { IntroSequence, INTRO_RAIL_LABELS } from './components/IntroSequence';
 import { ProjectSlideshow, SLUGS } from './components/ProjectSlideshow';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
 import { ProgressRail } from './components/ProgressRail';
-import { ForegroundDrift } from './components/ForegroundDrift';
 import { PROJECTS } from './data/projects';
 
 function introSeen(): boolean {
@@ -42,7 +41,6 @@ async function main() {
   let intro: IntroSequence | null = null;
   let slideshow: ProjectSlideshow | null = null;
   let playground: PlaygroundPanel | null = null;
-  let foreground: ForegroundDrift | null = null;
   let pendingSlide = 0;
 
   const rail = new ProgressRail(railLabels, INTRO_OFFSET, (i) => {
@@ -74,10 +72,6 @@ async function main() {
     slideshow.show({ initialIndex });
     playground = new PlaygroundPanel(particleScene);
     playground.mount(app);
-    if (!reducedMotion) {
-      foreground = new ForegroundDrift();
-      foreground.mount(app);
-    }
   };
 
   const teardownSlideshow = (): void => {
@@ -85,8 +79,6 @@ async function main() {
     slideshow = null;
     playground?.destroy();
     playground = null;
-    foreground?.destroy();
-    foreground = null;
     history.replaceState(null, '', location.pathname + location.search);
   };
 

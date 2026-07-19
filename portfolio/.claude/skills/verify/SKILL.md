@@ -41,8 +41,6 @@ npm run dev            # http://localhost:5173 (run in background)
   sliders `#pg-speed` etc., count select `#pg-count` triggers a live rebuild).
 - Filament mode: project-card slides gather particles into long thin curl
   lines (lineStrength ramps ~1s); Work/Contact slides dissolve back to chaos.
-- Foreground drift: sparse bokeh streamlets on a 2D canvas (z-15) cross over
-  the card every ~10-18s; absent under reduced motion.
 - Reduced motion: context `reducedMotion: 'reduce'` → straight to slideshow.
 - Console must stay clean except: aborted font requests (driver-induced) and
   a `THREE.Clock` deprecation warning (known, cosmetic).

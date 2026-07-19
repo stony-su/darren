@@ -6,7 +6,7 @@ import { createTextTargetTexture } from './TextTargets';
 import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
 import { loadSettings } from './settings';
-import type { MouseMode } from './settings';
+import type { MouseMode, LineMode } from './settings';
 import { THEMES, bgToRgb } from '../theme/themes';
 import { applyThemeCssVars } from '../theme/themes';
 import type { Vec3Tuple } from '../theme/themes';
@@ -69,8 +69,10 @@ export class ParticleScene {
   // Card deflection
   private cardStrengthTarget = 0;
 
-  // Filament-line mode (project-card slides)
+  // Filament-line mode (project-card slides, or forced via the panel)
   private lineTarget = 0;
+  private autoLine = false;
+  private panelLineMode: LineMode = 'auto';
   private simTime = 0;
 
   // Text formation
@@ -384,8 +386,22 @@ export class ParticleScene {
     this.windTarget.set(x, y, z);
   }
 
-  /** Gather the field into curl filament lines (project-card slides). */
+  /** Slideshow hook: gather the field into curl filament lines on
+   *  project-card slides ('auto' panel mode). */
   setLineMode(on: boolean): void {
+    this.autoLine = on;
+    this.applyLine();
+  }
+
+  /** Playground override: 'auto' follows the slideshow, 'on'/'off' force it. */
+  setLineModeOverride(mode: LineMode): void {
+    this.panelLineMode = mode;
+    this.applyLine();
+  }
+
+  private applyLine(): void {
+    const on =
+      this.panelLineMode === 'auto' ? this.autoLine : this.panelLineMode === 'on';
     if (on && this.lineTarget === 0) {
       // Chains assembling at speed leave bright smears; keep trails flushed
       // until the lines have mostly formed.
