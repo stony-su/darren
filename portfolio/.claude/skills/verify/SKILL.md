@@ -37,8 +37,11 @@ npm run dev            # http://localhost:5173 (run in background)
   + Contact, evenly spread with a `.rail-progress` fill line. Visible during
   BOTH intro and slideshow. Intro dots (`.rail-btn-intro`) navigate intro
   lines / replay the intro from the slideshow; slide dots jump slides.
-- "All projects" grid overlay (Escape closes), playground gear (`.pg-gear`,
-  sliders `#pg-speed` etc., count select `#pg-count` triggers a live rebuild).
+- "All projects" grid overlay (Escape/backdrop/✕ close, fade in/out,
+  staggered tiles). Playground: gear `.pg-gear` slides in a full-height
+  right sidebar (`.pg-panel.open`; Escape or `#pg-close` closes); sliders
+  `#pg-speed` etc., `#pg-line-mode` cycles swirl-lines Auto/Always/Off,
+  count select `#pg-count` triggers a live rebuild.
 - Filament mode: project-card slides gather particles into long thin curl
   lines (lineStrength ramps ~1s); Work/Contact slides dissolve back to chaos.
 - Reduced motion: context `reducedMotion: 'reduce'` → straight to slideshow.

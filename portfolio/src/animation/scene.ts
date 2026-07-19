@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { Curl } from './Curl';
 import { createFeatherGeometry } from './Feather';
 import { PostPipeline } from './PostPipeline';
-import { createTextTargetTexture } from './TextTargets';
+import { STAGE_W, STAGE_H } from './IntroChoreography';
+import type { TargetDrawer } from './IntroChoreography';
 import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
 import { loadSettings } from './settings';
@@ -75,10 +76,20 @@ export class ParticleScene {
   private panelLineMode: LineMode = 'auto';
   private simTime = 0;
 
-  // Text formation
-  private textTexture: THREE.DataTexture | null = null;
-  private textPromise: Promise<void> | null = null;
-  private textString: string | null = null;
+  // Animated formation targets (intro slides). A per-slide drawer paints
+  // white shapes on an offscreen canvas; lit pixels become spring targets.
+  private drawer: TargetDrawer | null = null;
+  private drawerStart = 0;
+  private lastRaster = -1;
+  private targetTexture: THREE.DataTexture | null = null;
+  private targetData: Float32Array | null = null;
+  private targetCanvas: HTMLCanvasElement | null = null;
+  private targetCtx: CanvasRenderingContext2D | null = null;
+  private litBuf: Int32Array | null = null;
+  private assignRand: Float32Array | null = null;
+  private targetJitter: Float32Array | null = null;
+  private hasTargets = false;
+  private fontsReady = false;
   private targetStrengthGoal = 0;
   private burst = 0;
 
@@ -176,6 +187,15 @@ export class ParticleScene {
 
     applyThemeCssVars(0);
 
+    // Formations rasterize real fonts; wait for Playfair (capped so a font
+    // outage never blanks the intro).
+    Promise.race([
+      document.fonts.ready,
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]).then(() => {
+      this.fontsReady = true;
+    });
+
     window.addEventListener('resize', this.onResize);
     window.addEventListener('mousemove', this.onMouseMove);
   }
@@ -203,12 +223,11 @@ export class ParticleScene {
     this.instanceCount = count;
     this.curl = this.buildCurl(count);
     this.curl.activate(this.scene);
-    // Text targets are sized to the lookup texture; regenerate for the new size.
-    if (this.textString) {
-      const text = this.textString;
-      this.textTexture?.dispose();
-      this.textTexture = null;
-      this.initTextTargets(text);
+    // Formation targets are sized to the lookup texture; the next raster
+    // tick regenerates them for the new size.
+    if (this.drawer) {
+      this.ensureTargetResources();
+      this.lastRaster = -1;
     } else {
       // Mid-browse rebuilds (perf downgrade, count change) must not collapse
       // the field to the center — it hides behind the card for seconds.
@@ -319,30 +338,25 @@ export class ParticleScene {
     return this.themeIndexB;
   }
 
-  /* ── Text formation ── */
+  /* ── Animated formation targets ── */
 
-  /** Start generating the target texture for particle text formation. */
-  initTextTargets(text: string): void {
-    this.textString = text;
-    const lookupSize = this.curl.soul.size;
-    const { w } = this.worldSizeAtZ0();
-    this.textPromise = createTextTargetTexture(text, lookupSize, w).then((tex) => {
-      // A rebuild may have superseded this generation
-      if (this.textString !== text) {
-        tex.dispose();
-        return;
-      }
-      this.textTexture?.dispose();
-      this.textTexture = tex;
-      this.soulUniforms.t_target.value = tex;
-    });
+  /**
+   * Set the drawer whose output the particles chase (null clears it). The
+   * drawer's clock restarts, so slide animations begin fresh on entry. The
+   * scene re-rasterizes a few times a second while formation is active; the
+   * particle springs do the actual tweening between frames.
+   */
+  setTargetDrawer(drawer: TargetDrawer | null): void {
+    this.drawer = drawer;
+    this.drawerStart = performance.now() / 1000;
+    this.lastRaster = -1;
   }
 
-  /** Ramp particle text formation on/off. */
+  /** Ramp particle formation on/off. */
   setTextFormation(active: boolean): void {
-    // Releasing a held formation fires a scatter burst so the letters
+    // Releasing a held formation fires a scatter burst so the shapes
     // dissolve into the flow instead of lingering as a dense cluster.
-    if (!active && this.targetStrengthGoal > 0 && this.textTexture) {
+    if (!active && this.targetStrengthGoal > 0 && this.hasTargets) {
       this.burst = 1;
       // Flush bright trails so the dissolve doesn't smear into a whiteout
       this.post.kickDamp(0.45, 1200);
@@ -350,14 +364,95 @@ export class ParticleScene {
     this.targetStrengthGoal = active ? 1 : 0;
   }
 
-  disposeTextTargets(): void {
+  disposeTargets(): void {
+    this.drawer = null;
     this.targetStrengthGoal = 0;
     this.soulUniforms.targetStrength.value = 0;
     this.soulUniforms.t_target.value = null;
-    this.textTexture?.dispose();
-    this.textTexture = null;
-    this.textString = null;
-    this.textPromise = null;
+    this.targetTexture?.dispose();
+    this.targetTexture = null;
+    this.targetData = null;
+    this.assignRand = null;
+    this.targetJitter = null;
+    this.targetCanvas = null;
+    this.targetCtx = null;
+    this.litBuf = null;
+    this.hasTargets = false;
+  }
+
+  /** Lazily (re)build the canvas + lookup-sized target buffers. */
+  private ensureTargetResources(): void {
+    if (!this.targetCanvas || !this.targetCtx) {
+      this.targetCanvas = document.createElement('canvas');
+      this.targetCanvas.width = STAGE_W;
+      this.targetCanvas.height = STAGE_H;
+      this.targetCtx = this.targetCanvas.getContext('2d', { willReadFrequently: true })!;
+      this.litBuf = new Int32Array(STAGE_W * STAGE_H);
+    }
+    const size = this.curl.soul.size;
+    if (!this.targetTexture || this.targetTexture.image.width !== size) {
+      const texels = size * size;
+      this.targetTexture?.dispose();
+      this.targetData = new Float32Array(texels * 4);
+      this.assignRand = new Float32Array(texels);
+      this.targetJitter = new Float32Array(texels * 3);
+      for (let i = 0; i < texels; i++) {
+        // w: stable per-particle stagger — also the participation mask, so
+        // the same particles stay members across every animation frame.
+        this.targetData[i * 4 + 3] = Math.random();
+        // Stable position within the lit-pixel list: small shape changes
+        // become small target moves instead of a full reshuffle.
+        this.assignRand[i] = Math.random();
+        this.targetJitter[i * 3] = (Math.random() - 0.5) * 0.01;
+        this.targetJitter[i * 3 + 1] = (Math.random() - 0.5) * 0.01;
+        this.targetJitter[i * 3 + 2] = (Math.random() - 0.5) * 0.06;
+      }
+      this.targetTexture = new THREE.DataTexture(
+        this.targetData, size, size, THREE.RGBAFormat, THREE.FloatType
+      );
+      this.targetTexture.minFilter = THREE.NearestFilter;
+      this.targetTexture.magFilter = THREE.NearestFilter;
+      this.hasTargets = false;
+      this.soulUniforms.t_target.value = this.targetTexture;
+    }
+  }
+
+  /** Draw the active drawer's current frame and pack lit pixels into the
+   *  target texture. The canvas maps to a fixed centered world rect, so
+   *  drawers compose against a stable stage. */
+  private rasterizeTargets(now: number): void {
+    const ctx = this.targetCtx!;
+    ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#fff';
+    this.drawer!(ctx, now - this.drawerStart);
+
+    const img = ctx.getImageData(0, 0, STAGE_W, STAGE_H).data;
+    const lit = this.litBuf!;
+    let n = 0;
+    for (let i = 0, p = 3; i < STAGE_W * STAGE_H; i++, p += 4) {
+      if (img[p] > 128) lit[n++] = i;
+    }
+    if (n === 0) return; // blank frame — hold the previous targets
+
+    const { w: worldW } = this.worldSizeAtZ0();
+    const stageW = Math.min(2.7, worldW * 0.9);
+    const stageH = stageW * (STAGE_H / STAGE_W);
+    const size = this.curl.soul.size;
+    const texels = size * size;
+    const data = this.targetData!;
+    const assign = this.assignRand!;
+    const jitter = this.targetJitter!;
+    for (let i = 0; i < texels; i++) {
+      const pix = lit[(assign[i] * n) | 0];
+      const px = pix % STAGE_W;
+      const py = (pix / STAGE_W) | 0;
+      data[i * 4] = (px / STAGE_W - 0.5) * stageW + jitter[i * 3];
+      data[i * 4 + 1] = -(py / STAGE_H - 0.5) * stageH + jitter[i * 3 + 1];
+      data[i * 4 + 2] = jitter[i * 3 + 2];
+    }
+    this.targetTexture!.needsUpdate = true;
+    this.hasTargets = true;
   }
 
   /* ── Content-aware flow ── */
@@ -547,9 +642,21 @@ export class ParticleScene {
         this.post.setDamp(this.trailOverride ?? theme.afterimageDamp);
       }
 
-      // Text formation strength ramp (in ~0.5s, out ~0.35s)
+      // Animated formation: re-rasterize the active drawer a few times a
+      // second while the formation is (or is fading) on-screen.
+      const strengthNow = this.soulUniforms.targetStrength.value as number;
+      if (this.drawer && this.fontsReady && (this.targetStrengthGoal > 0 || strengthNow > 0.001)) {
+        const now = performance.now() / 1000;
+        if (this.lastRaster < 0 || now - this.lastRaster >= 0.08) {
+          this.ensureTargetResources();
+          this.rasterizeTargets(now);
+          this.lastRaster = now;
+        }
+      }
+
+      // Formation strength ramp (in ~0.5s, out ~0.35s)
       const ts = this.soulUniforms.targetStrength.value as number;
-      const goalActive = this.targetStrengthGoal > 0 && this.textTexture !== null;
+      const goalActive = this.targetStrengthGoal > 0 && this.hasTargets;
       const tsGoal = goalActive ? this.targetStrengthGoal : 0;
       this.soulUniforms.targetStrength.value =
         ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 2.2 : 3.0));
@@ -593,7 +700,7 @@ export class ParticleScene {
     }
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('mousemove', this.onMouseMove);
-    this.disposeTextTargets();
+    this.disposeTargets();
     this.curl.dispose();
     this.post.dispose();
     this.renderer.dispose();

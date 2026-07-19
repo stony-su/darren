@@ -34,6 +34,20 @@ body {
   will-change: opacity, transform, filter;
 }
 
+/* Curved intro text: sentences ride an SVG arc pinned to the top or bottom
+   band, leaving the center stage to the particle choreography. */
+.intro-curve {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+.intro-curve text {
+  letter-spacing: 0.04em;
+}
+
 /* Sticker pop-in base */
 .sticker {
   will-change: transform, opacity;

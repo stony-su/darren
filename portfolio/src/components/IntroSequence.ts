@@ -1,4 +1,12 @@
 import { ParticleScene } from '../animation/scene';
+import {
+  darrenDrawer,
+  typedCodeDrawer,
+  murmurationDrawer,
+  slapShotDrawer,
+  paperPlaneDrawer,
+} from '../animation/IntroChoreography';
+import type { TargetDrawer } from '../animation/IntroChoreography';
 import { THEMES, ALL_TEXT_CLASSES } from '../theme/themes';
 
 /* ── Sticker / Image Config ── */
@@ -15,41 +23,55 @@ interface StickerConfig {
   delay: number;
 }
 
+/** Curved-text layout: the sentence rides an SVG path instead of a straight
+ *  line, pinned to the top or bottom band so the particle stage stays clear. */
+interface ArcConfig {
+  viewBox: string;
+  path: string;
+  fontSize: number;
+  width: string;
+}
+
 interface IntroLine {
   text: string;
   /** Short name shown in the bottom timeline. */
   railLabel: string;
-  /** When set, the particle field forms this word while the line is active. */
-  particleText?: string;
-  /** Vertical offset for the DOM text (to clear the particle-formed word). */
-  offsetY?: string;
+  /** Factory for the slide's particle choreography (fresh state per entry). */
+  makeDrawer: () => TargetDrawer;
+  /** Curved text geometry. */
+  arc: ArcConfig;
+  /** Vertical anchor for the text band. */
+  anchor: { top?: string; bottom?: string };
   theme: number;
   className: string;
   fontStyle: 'display' | 'body';
   stickers: StickerConfig[];
 }
 
-/* ── Per-sentence image stickers ── */
+/* ── Per-sentence image stickers ──
+   Pushed hard against the screen edges (some bleeding off) so the center
+   stage belongs to the particle choreography. Slides with top-anchored text
+   keep their top corners clear, and vice versa. */
 
 const WEBSITE_STICKERS: StickerConfig[] = [
-  { src: '/pictures/websites/5q1dcsong1.jpg',        alt: 'Website screenshot: Vertex volunteer platform', left: '4%',  top: '10%',    rotation: -8,  width: 'clamp(280px, 28vw, 420px)', delay: 0 },
-  { src: '/pictures/websites/chrome_5HrZmrCiJh.png', alt: 'Website screenshot',                            right: '4%', top: '10%',    rotation: 6,   width: 'clamp(280px, 28vw, 420px)', delay: 120 },
-  { src: '/pictures/websites/chrome_cL5et3zIG2.jpg', alt: 'Website screenshot',                            left: '8%',  bottom: '5%',  rotation: 5,   width: 'clamp(280px, 28vw, 420px)', delay: 240 },
-  { src: '/pictures/websites/chrome_dvATHhXx82.png', alt: 'Website screenshot',                            right: '8%', bottom: '5%',  rotation: -5,  width: 'clamp(280px, 28vw, 420px)', delay: 360 },
+  { src: '/pictures/websites/5q1dcsong1.jpg',        alt: 'Website screenshot: Vertex volunteer platform', left: '-4%',  top: '30%',   rotation: -12, width: 'clamp(230px, 21vw, 340px)', delay: 0 },
+  { src: '/pictures/websites/chrome_5HrZmrCiJh.png', alt: 'Website screenshot',                            right: '-4%', top: '30%',   rotation: 10,  width: 'clamp(230px, 21vw, 340px)', delay: 120 },
+  { src: '/pictures/websites/chrome_cL5et3zIG2.jpg', alt: 'Website screenshot',                            left: '-3%',  bottom: '3%', rotation: 8,   width: 'clamp(230px, 21vw, 340px)', delay: 240 },
+  { src: '/pictures/websites/chrome_dvATHhXx82.png', alt: 'Website screenshot',                            right: '-3%', bottom: '3%', rotation: -9,  width: 'clamp(230px, 21vw, 340px)', delay: 360 },
 ];
 
 const BOOK_STICKERS: StickerConfig[] = [
-  { src: '/pictures/books/71A6umHGhhL._UF894,1000_QL80_.jpg',  alt: 'Book cover',                          left: '4%',  top: '10%',    rotation: -6, width: 'clamp(170px, 16vw, 240px)', delay: 0 },
-  { src: '/pictures/books/71Hp0VjEETL._UF1000,1000_QL80_.jpg', alt: 'Book cover',                          right: '4%', top: '10%',    rotation: 8,  width: 'clamp(170px, 16vw, 240px)', delay: 150 },
-  { src: '/pictures/books/71yt6mN5HuL.jpg',                    alt: 'Book cover',                          left: '8%',  bottom: '10%', rotation: 4,  width: 'clamp(170px, 16vw, 240px)', delay: 300 },
-  { src: '/pictures/books/name of the wind.jpg',               alt: 'Book cover: The Name of the Wind',    right: '8%', bottom: '10%', rotation: -7, width: 'clamp(170px, 16vw, 240px)', delay: 200 },
+  { src: '/pictures/books/71A6umHGhhL._UF894,1000_QL80_.jpg',  alt: 'Book cover',                       left: '1%',   top: '3%',  rotation: -10, width: 'clamp(135px, 13vw, 190px)', delay: 0 },
+  { src: '/pictures/books/71Hp0VjEETL._UF1000,1000_QL80_.jpg', alt: 'Book cover',                       right: '1%',  top: '3%',  rotation: 9,   width: 'clamp(135px, 13vw, 190px)', delay: 150 },
+  { src: '/pictures/books/71yt6mN5HuL.jpg',                    alt: 'Book cover',                       left: '-2%',  top: '42%', rotation: 6,   width: 'clamp(135px, 13vw, 190px)', delay: 300 },
+  { src: '/pictures/books/name of the wind.jpg',               alt: 'Book cover: The Name of the Wind', right: '-2%', top: '42%', rotation: -7,  width: 'clamp(135px, 13vw, 190px)', delay: 220 },
 ];
 
 const HOCKEY_STICKERS: StickerConfig[] = [
-  { src: '/pictures/hockey/mmexport1676255013225.jpg',  alt: 'Playing hockey',    left: '4%',  top: '10%',    rotation: -5, width: 'clamp(280px, 28vw, 420px)', delay: 0 },
-  { src: '/pictures/hockey/PXL_20230212_013808761.jpg', alt: 'Hockey game photo', right: '4%', top: '10%',    rotation: 7,  width: 'clamp(280px, 28vw, 420px)', delay: 120 },
-  { src: '/pictures/hockey/PXL_20230321_004747088.jpg', alt: 'Hockey team photo', left: '8%',  bottom: '5%',  rotation: 6,  width: 'clamp(280px, 28vw, 420px)', delay: 240 },
-  { src: '/pictures/hockey/PXL_20240118_010237560.jpg', alt: 'On the ice',        right: '8%', bottom: '5%',  rotation: -4, width: 'clamp(280px, 28vw, 420px)', delay: 360 },
+  { src: '/pictures/hockey/mmexport1676255013225.jpg',  alt: 'Playing hockey',    left: '-4%',  top: '3%',  rotation: -13, width: 'clamp(220px, 20vw, 330px)', delay: 0 },
+  { src: '/pictures/hockey/PXL_20230212_013808761.jpg', alt: 'Hockey game photo', right: '-4%', top: '3%',  rotation: 11,  width: 'clamp(220px, 20vw, 330px)', delay: 120 },
+  { src: '/pictures/hockey/PXL_20230321_004747088.jpg', alt: 'Hockey team photo', left: '-5%',  top: '40%', rotation: 7,   width: 'clamp(220px, 20vw, 330px)', delay: 240 },
+  { src: '/pictures/hockey/PXL_20240118_010237560.jpg', alt: 'On the ice',        right: '-5%', top: '40%', rotation: -8,  width: 'clamp(220px, 20vw, 330px)', delay: 360 },
 ];
 
 /* ── The intro sentences ── */
@@ -58,8 +80,14 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: "Hi! I'm",
     railLabel: 'Darren',
-    particleText: 'DARREN',
-    offsetY: '-16vh',
+    makeDrawer: darrenDrawer,
+    arc: {
+      viewBox: '0 0 1000 300',
+      path: 'M 100 250 Q 500 105 900 250',
+      fontSize: 118,
+      width: 'min(700px, 82vw)',
+    },
+    anchor: { top: '3vh' },
     theme: 0,
     className: 'intro-line-rise',
     fontStyle: 'display',
@@ -68,6 +96,14 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: 'I code websites :D',
     railLabel: 'Websites',
+    makeDrawer: typedCodeDrawer,
+    arc: {
+      viewBox: '0 0 1000 300',
+      path: 'M 20 195 C 260 95 520 255 980 135',
+      fontSize: 84,
+      width: 'min(880px, 92vw)',
+    },
+    anchor: { top: '2vh' },
     theme: 1,
     className: 'intro-line-letter',
     fontStyle: 'body',
@@ -76,6 +112,14 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: "And when I'm not, you can find me reading…",
     railLabel: 'Reading',
+    makeDrawer: murmurationDrawer,
+    arc: {
+      viewBox: '0 0 1300 300',
+      path: 'M 20 185 C 350 75 700 285 1280 155',
+      fontSize: 56,
+      width: 'min(1080px, 94vw)',
+    },
+    anchor: { bottom: '9vh' },
     theme: 2,
     className: 'intro-line-scale',
     fontStyle: 'body',
@@ -84,6 +128,14 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: 'Or playing hockey!',
     railLabel: 'Hockey',
+    makeDrawer: slapShotDrawer,
+    arc: {
+      viewBox: '0 0 1000 300',
+      path: 'M 40 255 Q 520 235 960 75',
+      fontSize: 90,
+      width: 'min(820px, 88vw)',
+    },
+    anchor: { bottom: '8vh' },
     theme: 3,
     className: 'intro-line-slide',
     fontStyle: 'body',
@@ -92,6 +144,14 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: "And I'd like to work with you",
     railLabel: 'Together',
+    makeDrawer: paperPlaneDrawer,
+    arc: {
+      viewBox: '0 0 1100 300',
+      path: 'M 50 250 Q 550 95 1050 250',
+      fontSize: 72,
+      width: 'min(950px, 94vw)',
+    },
+    anchor: { top: '3vh' },
     theme: 4,
     className: 'intro-line-blur',
     fontStyle: 'display',
@@ -105,6 +165,8 @@ export const INTRO_RAIL_LABELS: string[] = INTRO_LINES.map((l) => l.railLabel);
 /* ── Timing ── */
 
 const FANOUT_DURATION = 2000;
+/** Free-flow beat between one formation dissolving and the next assembling. */
+const TRANSITION_GAP = 450;
 
 /* ══════════════════════════════════════════════════════════ */
 
@@ -120,6 +182,7 @@ export class IntroSequence {
   private skipButton: HTMLElement | null = null;
   private activeIndex = -1;
   private completed = false;
+  private formationTimer: number | null = null;
   private boundScrollHandler: () => void;
   private onLineChange: ((index: number) => void) | null;
 
@@ -145,8 +208,8 @@ export class IntroSequence {
     document.body.style.overflow = 'auto';
     document.body.style.overflowX = 'hidden';
 
-    /* Kick off particle text-target generation immediately */
-    this.scene.initTextTargets('DARREN');
+    /* Prime the first slide's choreography so the fan-out lands on targets */
+    this.scene.setTargetDrawer(INTRO_LINES[startLine].makeDrawer());
 
     /* Scroll spacer — one viewport height per line plus buffer. Use dvh where
        supported so mobile URL-bar collapse doesn't shift the sections. */
@@ -192,18 +255,27 @@ export class IntroSequence {
     overlay.appendChild(hint);
     this.scrollHint = hint;
 
-    INTRO_LINES.forEach((line) => {
-      /* — Text element — */
+    INTRO_LINES.forEach((line, i) => {
+      /* — Curved text element — */
       const el = document.createElement('div');
-      el.className = `intro-line absolute opacity-0 text-center px-8 max-w-4xl ${line.className}`;
+      el.className = `intro-line absolute opacity-0 ${line.className}`;
       el.setAttribute('data-theme', String(line.theme));
       el.style.zIndex = '10';
+      el.style.left = '0';
+      el.style.right = '0';
+      if (line.anchor.top) el.style.top = line.anchor.top;
+      if (line.anchor.bottom) el.style.bottom = line.anchor.bottom;
 
-      const spanClass = line.fontStyle === 'display' ? 'font-display italic' : 'font-body';
-      /* Inner wrapper carries the vertical offset so it doesn't clobber the
-         animation classes' transforms on the outer element. */
-      const offset = line.offsetY ? ` style="transform: translateY(${line.offsetY})"` : '';
-      el.innerHTML = `<div${offset}><span class="${spanClass}">${line.text}</span></div>`;
+      const fontClass = line.fontStyle === 'display' ? 'font-display italic' : 'font-body';
+      const fontWeight = line.fontStyle === 'display' ? 400 : 500;
+      el.innerHTML = `
+        <svg class="intro-curve" viewBox="${line.arc.viewBox}" style="width: ${line.arc.width}">
+          <defs><path id="intro-arc-${i}" d="${line.arc.path}" fill="none"/></defs>
+          <text class="${fontClass}" fill="currentColor"
+                style="font-size: ${line.arc.fontSize}px; font-weight: ${fontWeight}">
+            <textPath href="#intro-arc-${i}" startOffset="50%" text-anchor="middle">${line.text}</textPath>
+          </text>
+        </svg>`;
 
       overlay.appendChild(el);
       this.lineElements.push(el);
@@ -265,8 +337,6 @@ export class IntroSequence {
       }
     });
 
-    this.applySizing();
-
     if (immediate || startLine > 0) {
       /* Replay / deep entry: particles are already spread — land directly */
       window.scrollTo({ top: startLine * window.innerHeight, behavior: 'auto' });
@@ -275,7 +345,7 @@ export class IntroSequence {
       return;
     }
 
-    /* Begin forming DARREN slightly before the first line lands */
+    /* Begin forming the first slide slightly before the line lands */
     setTimeout(() => {
       if (!this.completed) this.scene.setTextFormation(true);
     }, Math.max(0, FANOUT_DURATION - 700));
@@ -309,16 +379,6 @@ export class IntroSequence {
     this.completeIntro();
   }
 
-  /* ── Sizing per line ── */
-
-  private applySizing(): void {
-    const baseSize = 'text-5xl md:text-7xl lg:text-8xl tracking-tight';
-
-    this.lineElements.forEach((el) => {
-      el.classList.add(...baseSize.split(' '));
-    });
-  }
-
   /* ── Scroll Handler ── */
 
   private handleScroll(): void {
@@ -348,9 +408,17 @@ export class IntroSequence {
 
   /* ── Show / Hide a line ── */
 
+  private clearFormationTimer(): void {
+    if (this.formationTimer !== null) {
+      clearTimeout(this.formationTimer);
+      this.formationTimer = null;
+    }
+  }
+
   private showLine(index: number): void {
     if (index < 0 || index >= INTRO_LINES.length) return;
 
+    const isTransition = this.activeIndex >= 0 && this.activeIndex !== index;
     this.activeIndex = index;
     const line = INTRO_LINES[index];
     const el = this.lineElements[index];
@@ -359,9 +427,20 @@ export class IntroSequence {
     this.onLineChange?.(index);
     this.scene.setTheme(line.theme);
 
-    if (line.particleText !== undefined) {
+    /* Every slide is a formation now: swap in its choreography, and — when
+       coming from another slide — let the release burst breathe for a beat
+       before the cloud gathers into the new shape. */
+    this.scene.setTargetDrawer(line.makeDrawer());
+    this.clearFormationTimer();
+    if (isTransition) {
+      this.formationTimer = window.setTimeout(() => {
+        this.formationTimer = null;
+        if (!this.completed) this.scene.setTextFormation(true);
+      }, TRANSITION_GAP);
+    } else {
       this.scene.setTextFormation(true);
     }
+
     if (this.scrollHint) {
       this.scrollHint.style.opacity = index === 0 ? '0.5' : '0';
     }
@@ -388,13 +467,11 @@ export class IntroSequence {
   private hideLine(index: number): void {
     if (index < 0 || index >= INTRO_LINES.length) return;
 
-    const line = INTRO_LINES[index];
     const el = this.lineElements[index];
     const sc = this.stickerContainers[index];
 
-    if (line.particleText !== undefined) {
-      this.scene.setTextFormation(false);
-    }
+    // Dissolve the formation — the release burst is the scene transition
+    this.scene.setTextFormation(false);
 
     el.classList.remove('intro-line-active');
     el.classList.add('intro-line-exit');
@@ -418,6 +495,7 @@ export class IntroSequence {
     this.completed = true;
 
     window.removeEventListener('scroll', this.boundScrollHandler);
+    this.clearFormationTimer();
 
     try {
       sessionStorage.setItem('introSeen', '1');
@@ -443,14 +521,14 @@ export class IntroSequence {
         this.scrollSpacer?.remove();
         window.scrollTo(0, 0);
         document.body.style.overflow = 'hidden';
-        this.scene.disposeTextTargets();
+        this.scene.disposeTargets();
         this.onComplete();
       }, 800);
     } else {
       this.scrollSpacer?.remove();
       window.scrollTo(0, 0);
       document.body.style.overflow = 'hidden';
-      this.scene.disposeTextTargets();
+      this.scene.disposeTargets();
       this.onComplete();
     }
   }
