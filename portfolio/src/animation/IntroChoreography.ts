@@ -6,6 +6,11 @@
  * GPGPU target texture; the particle springs chase the moving targets, so
  * every scene is literally the same cloud flowing into a new drawing.
  *
+ * Design rule (learned the hard way): keep each shape a clean, mostly-static
+ * silhouette with a slow, low-amplitude idle. If the drawing lurches frame to
+ * frame, the springs chase a jumping target and the cloud looks erratic. A
+ * near-static target + gentle idle = cohesive, DARREN-like elegance.
+ *
  * Drawer contract: paint white-on-transparent into a STAGE_W x STAGE_H
  * canvas (the rasterizer clears it first and only reads alpha). `t` is
  * seconds since the slide became active, so animations restart on entry.
@@ -41,308 +46,162 @@ export function darrenDrawer(): TargetDrawer {
   };
 }
 
-/* ══════════ Slide 1 — "I code websites" : live-typed snippet ══════════ */
+/* ══════════ Slide 1 — "I code websites" : </> glyph, breathing ══════════ */
 
-const CODE_LINES = [
-  'const darren = {',
-  "  builds: 'websites',",
-  "  stack: ['ts', 'three'],",
-  "  vibe: 'handcrafted',",
-  '};',
-];
-
-export function typedCodeDrawer(): TargetDrawer {
-  const total = CODE_LINES.reduce((n, l) => n + l.length, 0);
-  const TYPE_CPS = 16;
-  const DELETE_CPS = 70;
-  const typeDur = total / TYPE_CPS;
-  const holdDur = 2.8;
-  const deleteDur = total / DELETE_CPS;
-  const pauseDur = 0.8;
-  const cycle = typeDur + holdDur + deleteDur + pauseDur;
-
-  const FONT = '500 40px Consolas, "Courier New", monospace';
-  const LH = 58;
-  const codeX = 200;
-  const codeY = 150;
+export function codeGlyphDrawer(): TargetDrawer {
+  const cx = STAGE_W / 2;
+  const cy = STAGE_H / 2;
+  const h = 146; // bracket half-height
+  const bw = 126; // bracket horizontal run
+  const gap = 298; // apex distance from center — spread wide so the three
+  //                  marks read as distinct strokes, not one dense blob.
 
   return (ctx, t) => {
-    const tc = t % cycle;
+    // Very slow, small breathing so particles mostly settle (settled particles
+    // show palette color; constantly-moving ones glow white and bloom out).
+    const s = 1 + 0.03 * Math.sin(t * 0.5);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(s, s);
+    ctx.translate(-cx, -cy);
 
-    /* Editor chrome stays put the whole time — a stable anchor while the
-       code inside is typed and wiped. */
+    // Stroke weight is tuned so the lit-pixel count (hence particle density)
+    // lands near DARREN's — thin strokes overpack particles and whiteout.
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 40;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // "<" angle bracket
     ctx.beginPath();
-    if ('roundRect' in ctx) {
-      ctx.roundRect(130, 48, 700, 384, 28);
-    } else {
-      (ctx as CanvasRenderingContext2D).rect(130, 48, 700, 384);
-    }
+    ctx.moveTo(cx - gap + bw, cy - h);
+    ctx.lineTo(cx - gap, cy);
+    ctx.lineTo(cx - gap + bw, cy + h);
     ctx.stroke();
-    ctx.fillStyle = '#fff';
-    for (let d = 0; d < 3; d++) {
-      ctx.beginPath();
-      ctx.arc(176 + d * 30, 86, 8, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
-    let visible: number;
-    let blink: boolean;
-    if (tc < typeDur) {
-      visible = Math.floor(tc * TYPE_CPS);
-      blink = true;
-    } else if (tc < typeDur + holdDur) {
-      visible = total;
-      blink = (tc * 1.9) % 1 < 0.55;
-    } else if (tc < typeDur + holdDur + deleteDur) {
-      visible = total - Math.floor((tc - typeDur - holdDur) * DELETE_CPS);
-      blink = true;
-    } else {
-      visible = 0;
-      blink = (tc * 1.9) % 1 < 0.55;
-    }
-    visible = Math.max(0, Math.min(total, visible));
+    // ">" angle bracket
+    ctx.beginPath();
+    ctx.moveTo(cx + gap - bw, cy - h);
+    ctx.lineTo(cx + gap, cy);
+    ctx.lineTo(cx + gap - bw, cy + h);
+    ctx.stroke();
 
-    ctx.font = FONT;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const charW = ctx.measureText('0').width;
+    // "/" slash
+    ctx.beginPath();
+    ctx.moveTo(cx - 84, cy + h);
+    ctx.lineTo(cx + 84, cy - h);
+    ctx.stroke();
 
-    let remaining = visible;
-    let cursorX = codeX;
-    let cursorY = codeY;
-    for (let li = 0; li < CODE_LINES.length; li++) {
-      const line = CODE_LINES[li];
-      const shown = Math.min(line.length, remaining);
-      if (shown > 0) {
-        ctx.fillText(line.slice(0, shown), codeX, codeY + li * LH);
-      }
-      remaining -= shown;
-      if (shown < line.length || li === CODE_LINES.length - 1) {
-        cursorX = codeX + shown * charW;
-        cursorY = codeY + li * LH;
-        if (remaining <= 0) break;
-      }
-    }
-
-    if (blink) {
-      ctx.fillRect(cursorX + 4, cursorY - 22, charW * 0.9, 44);
-    }
+    ctx.restore();
   };
 }
 
-/* ══════════ Slide 2 — reading : a murmuration of words ══════════ */
+/* ══════════ Slide 2 — reading : open book, pages flutter ══════════ */
 
-const FLOCK_WORDS = [
-  'stories', 'worlds', 'wonder', 'magic', 'heroes', 'myths',
-  'pages', 'dreams', 'quests', 'legends', 'ink', 'chapters',
-];
-
-export function murmurationDrawer(): TargetDrawer {
-  const n = FLOCK_WORDS.length;
-  const px = new Float32Array(n);
-  const py = new Float32Array(n);
-  const vx = new Float32Array(n);
-  const vy = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    px[i] = STAGE_W / 2 + Math.cos(a) * 240;
-    py[i] = STAGE_H / 2 + Math.sin(a) * 140;
-    vx[i] = -Math.sin(a) * 110;
-    vy[i] = Math.cos(a) * 70;
-  }
-  let last = 0;
+export function openBookDrawer(): TargetDrawer {
+  const cx = STAGE_W / 2;
+  const cy = STAGE_H / 2;
 
   return (ctx, t) => {
-    const dt = Math.min(0.15, Math.max(0.001, t - last));
-    last = t;
+    // Subtle, slow flutter so particles settle into color instead of glowing.
+    const fL = Math.sin(t * 0.5) * 6;
+    const fR = Math.sin(t * 0.5 + 1.1) * 6;
 
-    /* A wandering attractor leads the flock; separation keeps the words
-       legible instead of piling into one blob. */
-    const ax = STAGE_W / 2 + STAGE_W * 0.29 * Math.sin(t * 0.33 + 1.3);
-    const ay = STAGE_H / 2 + STAGE_H * 0.22 * Math.sin(t * 0.51);
-
-    for (let i = 0; i < n; i++) {
-      vx[i] += (ax - px[i]) * 0.55 * dt;
-      vy[i] += (ay - py[i]) * 0.55 * dt;
-      vx[i] += Math.sin(t * 0.9 + i * 2.1) * 46 * dt;
-      vy[i] += Math.cos(t * 0.7 + i * 1.7) * 34 * dt;
-
-      for (let j = 0; j < n; j++) {
-        if (j === i) continue;
-        const dx = px[i] - px[j];
-        const dy = py[i] - py[j];
-        const d = Math.hypot(dx, dy);
-        if (d > 1 && d < 120) {
-          const push = ((120 - d) / 120) * 320 * dt;
-          vx[i] += (dx / d) * push;
-          vy[i] += (dy / d) * push * 1.4;
-        }
-      }
-
-      // Soft stage bounds
-      if (px[i] < 110) vx[i] += (110 - px[i]) * 2.4 * dt;
-      if (px[i] > STAGE_W - 110) vx[i] -= (px[i] - (STAGE_W - 110)) * 2.4 * dt;
-      if (py[i] < 70) vy[i] += (70 - py[i]) * 2.8 * dt;
-      if (py[i] > STAGE_H - 70) vy[i] -= (py[i] - (STAGE_H - 70)) * 2.8 * dt;
-
-      // Speed clamp keeps the flock lively but followable
-      const sp = Math.hypot(vx[i], vy[i]);
-      const target = sp < 70 ? 70 : sp > 190 ? 190 : sp;
-      if (sp > 1) {
-        vx[i] = (vx[i] / sp) * target;
-        vy[i] = (vy[i] / sp) * target;
-      }
-
-      px[i] += vx[i] * dt;
-      py[i] += vy[i] * dt;
-    }
-
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i < n; i++) {
-      // Tilt with the flight direction, mirrored so words never flip upside down
-      let ang = Math.atan2(vy[i], vx[i]);
-      if (ang > Math.PI / 2) ang -= Math.PI;
-      if (ang < -Math.PI / 2) ang += Math.PI;
-      ang = Math.max(-0.45, Math.min(0.45, ang));
-
-      const fs = 38 + ((i * 53) % 5) * 8;
-      ctx.save();
-      ctx.translate(px[i], py[i]);
-      ctx.rotate(ang);
-      ctx.font = `italic 600 ${fs}px "Playfair Display", Georgia, serif`;
-      ctx.fillText(FLOCK_WORDS[i], 0, 0);
-      ctx.restore();
-    }
-  };
-}
-
-/* ══════════ Slide 3 — hockey : wind-up, slap shot, puck burst ══════════ */
-
-/* Joint layout per pose, relative to the player's origin on the ice
-   (y negative = up): hip, shoulder, head, frontKnee, frontFoot, backKnee,
-   backFoot, upperHand, lowerHand, bladeTip. */
-type Pose = number[];
-
-const POSE_GLIDE_A: Pose = [0,-96, 12,-176, 20,-206, 40,-52, 58,-2, -30,-50, -58,-2, 38,-140, 72,-112, 138,-6];
-const POSE_GLIDE_B: Pose = [0,-100, 12,-178, 20,-208, 18,-56, -8,-2, 34,-50, 64,-2, 36,-138, 70,-110, 130,-8];
-const POSE_WINDUP:  Pose = [-6,-98, -14,-178, -6,-208, 52,-54, 66,-2, -34,-48, -62,-2, -4,-160, -52,-170, -118,-172];
-const POSE_CONTACT: Pose = [10,-92, 34,-168, 44,-198, 50,-52, 70,-2, -40,-46, -66,-2, 28,-128, 58,-96, 66,-4];
-const POSE_FOLLOW:  Pose = [16,-96, 44,-170, 54,-200, 52,-54, 72,-2, -20,-60, -52,-28, 40,-138, 76,-120, 160,-118];
-const POSE_SETTLE:  Pose = [12,-98, 36,-172, 46,-202, 48,-54, 68,-2, -26,-54, -58,-6, 40,-140, 74,-116, 150,-90];
-
-const SHOT_KEYFRAMES: [number, Pose][] = [
-  [0.0, POSE_GLIDE_A],
-  [0.55, POSE_GLIDE_B],
-  [1.1, POSE_GLIDE_A],
-  [2.0, POSE_WINDUP],
-  [2.3, POSE_CONTACT],
-  [2.7, POSE_FOLLOW],
-  [4.4, POSE_SETTLE],
-  [5.2, POSE_GLIDE_A],
-];
-
-const SHOT_CYCLE = 5.2;
-
-function samplePose(tc: number, out: Pose): void {
-  for (let k = 0; k < SHOT_KEYFRAMES.length - 1; k++) {
-    const [t0, p0] = SHOT_KEYFRAMES[k];
-    const [t1, p1] = SHOT_KEYFRAMES[k + 1];
-    if (tc >= t0 && tc <= t1) {
-      const f = ease((tc - t0) / (t1 - t0));
-      for (let i = 0; i < p0.length; i++) out[i] = lerp(p0[i], p1[i], f);
-      return;
-    }
-  }
-  const final = SHOT_KEYFRAMES[SHOT_KEYFRAMES.length - 1][1];
-  for (let i = 0; i < final.length; i++) out[i] = final[i];
-}
-
-export function slapShotDrawer(): TargetDrawer {
-  const pose: Pose = new Array(20).fill(0);
-
-  return (ctx, t) => {
-    const tc = t % SHOT_CYCLE;
-    const groundY = STAGE_H * 0.8;
-
-    // Skate in from the left, plant for the shot, drift back before the wrap
-    let x0: number;
-    if (tc < 2.2) x0 = lerp(STAGE_W * 0.16, STAGE_W * 0.4, ease(tc / 2.2));
-    else if (tc < 4.4) x0 = STAGE_W * 0.4 + ((tc - 2.2) / 2.2) * 20;
-    else x0 = lerp(STAGE_W * 0.4 + 20, STAGE_W * 0.16, ease((tc - 4.4) / 0.8));
-
-    samplePose(tc, pose);
-
-    // Ice
     ctx.strokeStyle = '#fff';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 4;
+
+    // Thick page outlines (medium weight → DARREN-like density → dim & legible)
+    // with a dark interior; the negative space is what reads as an open book.
+    ctx.lineWidth = 24;
     ctx.beginPath();
-    ctx.moveTo(50, groundY + 18);
-    ctx.lineTo(STAGE_W - 50, groundY + 18);
+    ctx.moveTo(cx - 16, cy - 56);
+    ctx.quadraticCurveTo(cx - 176, cy - 104 + fL, cx - 336, cy - 62 + fL);
+    ctx.lineTo(cx - 316, cy + 96 + fL * 0.5);
+    ctx.quadraticCurveTo(cx - 176, cy + 122, cx - 16, cy + 98);
+    ctx.closePath();
     ctx.stroke();
 
-    const P = (i: number): [number, number] => [x0 + pose[i * 2], groundY + pose[i * 2 + 1]];
-    const [hip, sh, head, fk, ff, bk, bf, h1, h2, blade] =
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(P);
-
-    const limb = (pts: [number, number][], w: number): void => {
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.stroke();
-    };
-
-    limb([hip, bk, bf], 26);          // back leg
-    limb([hip, fk, ff], 26);          // front leg
-    limb([hip, sh], 28);              // torso
-    limb([sh, h1, h2], 20);           // arms to the stick
-    limb([h1, h2, blade], 13);        // stick shaft
-    ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(head[0], head[1], 24, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(cx + 16, cy - 56);
+    ctx.quadraticCurveTo(cx + 176, cy - 104 + fR, cx + 336, cy - 62 + fR);
+    ctx.lineTo(cx + 316, cy + 96 + fR * 0.5);
+    ctx.quadraticCurveTo(cx + 176, cy + 122, cx + 16, cy + 98);
+    ctx.closePath();
+    ctx.stroke();
 
-    /* Puck: waits on the ice, launches at stick contact, flies flat-ish,
-       then bursts into a scatter ring — the transition energy. */
-    const SHOT_T = 2.3;
-    const FLIGHT = 1.0;
-    const burstX = STAGE_W * 0.88;
-    if (tc < SHOT_T) {
+    // Spine
+    ctx.lineWidth = 22;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 54);
+    ctx.lineTo(cx, cy + 96);
+    ctx.stroke();
+  };
+}
+
+/* ══════════ Slide 3 — hockey : ice skate, static + spray shimmer ══════════ */
+
+export function iceSkateDrawer(): TargetDrawer {
+  const cx = STAGE_W / 2;
+  const cy = STAGE_H / 2;
+
+  return (ctx, t) => {
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#fff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // The boot stays put so its particles settle into color; the ice-spray
+    // shimmer off the heel is the idle life.
+    const N = 6;
+    for (let k = 0; k < N; k++) {
+      const life = (t * 0.85 + k / N) % 1;
+      const sx = cx - 172 - life * 96;
+      const sy = cy + 66 + life * 22 + Math.sin(t * 5 + k) * 4;
+      const r = (1 - life) * 6 + 1.6;
       ctx.beginPath();
-      ctx.arc(x0 + 96, groundY - 12, 15, 0, Math.PI * 2);
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.fill();
-    } else if (tc < SHOT_T + FLIGHT) {
-      const f = (tc - SHOT_T) / FLIGHT;
-      const puckX = lerp(x0 + 70, burstX, f);
-      const puckY = groundY - 12 - 140 * (1 - Math.pow(1 - f, 2));
-      for (let k = 0; k < 4; k++) {
-        const fb = Math.max(0, f - k * 0.06);
-        const bx = lerp(x0 + 70, burstX, fb);
-        const by = groundY - 12 - 140 * (1 - Math.pow(1 - fb, 2));
-        ctx.beginPath();
-        ctx.arc(bx, by, 15 - k * 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.beginPath();
-      ctx.arc(puckX, puckY, 15, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (tc < SHOT_T + FLIGHT + 0.8) {
-      const f = (tc - SHOT_T - FLIGHT) / 0.8;
-      const R = 150 * ease(f);
-      const r = Math.max(2, 13 * (1 - f));
-      for (let k = 0; k < 14; k++) {
-        const a = (k / 14) * Math.PI * 2 + f * 0.9;
-        ctx.beginPath();
-        ctx.arc(burstX + Math.cos(a) * R, groundY - 152 + Math.sin(a) * R * 0.8, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
     }
+
+    // Boot outline (toe leading right, heel back-left)
+    ctx.lineWidth = 30;
+    ctx.beginPath();
+    ctx.moveTo(cx - 150, cy + 58);
+    ctx.lineTo(cx + 150, cy + 58);
+    ctx.quadraticCurveTo(cx + 188, cy + 44, cx + 178, cy + 2);
+    ctx.lineTo(cx + 108, cy - 92);
+    ctx.quadraticCurveTo(cx + 86, cy - 134, cx + 36, cy - 132);
+    ctx.lineTo(cx - 52, cy - 130);
+    ctx.quadraticCurveTo(cx - 112, cy - 122, cx - 122, cy - 52);
+    ctx.lineTo(cx - 148, cy + 16);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Laces across the ankle/tongue
+    ctx.lineWidth = 12;
+    for (let i = 0; i < 3; i++) {
+      const yy = cy - 84 + i * 32;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, yy);
+      ctx.lineTo(cx + 78, yy - 10);
+      ctx.stroke();
+    }
+
+    // Blade posts + runner
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(cx + 90, cy + 58);
+    ctx.lineTo(cx + 90, cy + 104);
+    ctx.moveTo(cx - 94, cy + 58);
+    ctx.lineTo(cx - 94, cy + 104);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 168, cy + 108);
+    ctx.lineTo(cx + 160, cy + 108);
+    ctx.quadraticCurveTo(cx + 190, cy + 106, cx + 190, cy + 80); // upturned toe pick
+    ctx.stroke();
   };
 }
 

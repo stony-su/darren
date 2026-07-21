@@ -10,6 +10,7 @@ uniform vec2  resolution;
 
 uniform sampler2D t_target;
 uniform float targetStrength;
+uniform float formationParticipation; // fraction of particles that join a formation
 
 uniform vec3  cardCenter;
 uniform vec2  cardHalfSize;
@@ -67,14 +68,16 @@ void main(){
   vel += windDir * 0.00012 * timeScale;
 
   // Text-formation lookup (needed by the exclusion logic below):
-  // only ~55% of particles join the formation; the rest keep flowing so the
-  // release never dumps the whole population in one burst.
+  // only a fraction of particles join the formation; the rest keep flowing so
+  // the release never dumps the whole population in one burst. Compact icon
+  // slides lower the fraction so the shape stays sparse and colorful instead of
+  // overlapping into a bloom-white blob.
   vec4 tgt = vec4(0.0);
   float participate = 0.0;
   float arrive = 0.0;
   if (targetStrength > 0.001) {
     tgt = texture2D(t_target, uv);
-    participate = step(tgt.w, 0.45);
+    participate = step(tgt.w, formationParticipation);
     arrive = clamp(targetStrength * 1.6 - fract(tgt.w * 7.0) * 0.5, 0.0, 1.0) * participate;
   }
 

@@ -16,6 +16,8 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform float uSpeedGlow;
 uniform float uLineStrength;
+uniform float uFormationGlow; // 1 normally; dips while a formation is held so
+//                               dense shapes show palette color, not bloom-white
 
 vec3 gradientColor(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec3 p4, vec4 fx, float normalFlag) {
   float t = fract(vLookup.x * fx.z + vLookup.y * fx.w);
@@ -25,8 +27,8 @@ vec3 gradientColor(vec3 p0, vec3 p1, vec3 p2, vec3 p3, vec3 p4, vec4 fx, float n
   col = mix(col, p3, smoothstep(0.5, 0.75, t));
   col = mix(col, p4, smoothstep(0.75, 1.0, t));
 
-  col += fx.x * (0.15 + 0.1 * sin(vLookup.x * 20.0 + vLookup.y * 15.0));
-  col += fx.y * (0.1 + 0.15 * sin(vLookup.x * 30.0) * sin(vLookup.y * 25.0));
+  col += fx.x * uFormationGlow * (0.15 + 0.1 * sin(vLookup.x * 20.0 + vLookup.y * 15.0));
+  col += fx.y * uFormationGlow * (0.1 + 0.15 * sin(vLookup.x * 30.0) * sin(vLookup.y * 25.0));
 
   return mix(clamp(col, 0.0, 1.0), vNorm * 0.5 + 0.5, normalFlag);
 }

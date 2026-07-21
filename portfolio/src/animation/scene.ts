@@ -93,6 +93,12 @@ export class ParticleScene {
   private targetStrengthGoal = 0;
   private burst = 0;
 
+  // Off-center formation placement (fractions of the visible world), eased.
+  private formationGoalX = 0;
+  private formationGoalY = 0;
+  private formationOffX = 0;
+  private formationOffY = 0;
+
   private animationId: number | null = null;
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
@@ -146,6 +152,7 @@ export class ParticleScene {
       mouseForce: { value: 0.0 },
       t_target: { value: null },
       targetStrength: { value: 0.0 },
+      formationParticipation: { value: 0.45 },
       cardCenter: { value: new THREE.Vector3(0, 0, 0) },
       cardHalfSize: { value: new THREE.Vector2(0.5, 0.35) },
       cardRadius: { value: 0.05 },
@@ -166,6 +173,7 @@ export class ParticleScene {
       uFxA: { value: new THREE.Vector4(theme0.fx.glow, theme0.fx.sparkle, ...theme0.fx.tScale) },
       uFxB: { value: new THREE.Vector4(theme0.fx.glow, theme0.fx.sparkle, ...theme0.fx.tScale) },
       uSnowflake: { value: 0.0 },
+      uFormationGlow: { value: 1.0 },
       uStretch: { value: 140.0 },
       uSpeedGlow: { value: 45.0 },
       uFogColor: { value: new THREE.Vector3(...this.bgSrgbA) },
@@ -352,6 +360,22 @@ export class ParticleScene {
     this.lastRaster = -1;
   }
 
+  /** Shift the whole formation off the middle of the stage. x/y are fractions
+   *  of the visible world size (x right, y up); the applied offset is eased and
+   *  clamped at raster time so the shape can never leave the frame. Lets each
+   *  slide place its cloud somewhere other than dead center. */
+  setFormationOffset(x: number, y: number): void {
+    this.formationGoalX = x;
+    this.formationGoalY = y;
+  }
+
+  /** Fraction of particles that join the next formation (0..1). Lower keeps a
+   *  compact shape sparse and colorful instead of overlapping into a white
+   *  blob; the default suits wide formations like the DARREN wordmark. */
+  setFormationParticipation(fraction: number): void {
+    this.soulUniforms.formationParticipation.value = Math.max(0.04, Math.min(1, fraction));
+  }
+
   /** Ramp particle formation on/off. */
   setTextFormation(active: boolean): void {
     // Releasing a held formation fires a scatter burst so the shapes
@@ -435,9 +459,14 @@ export class ParticleScene {
     }
     if (n === 0) return; // blank frame — hold the previous targets
 
-    const { w: worldW } = this.worldSizeAtZ0();
+    const { w: worldW, h: worldH } = this.worldSizeAtZ0();
     const stageW = Math.min(2.7, worldW * 0.9);
     const stageH = stageW * (STAGE_H / STAGE_W);
+    // Keep the (possibly offset) shape fully inside the frame.
+    const maxOffX = Math.max(0, worldW * 0.5 - stageW * 0.5 - worldW * 0.04);
+    const maxOffY = Math.max(0, worldH * 0.5 - stageH * 0.5 - worldH * 0.04);
+    const offX = Math.max(-maxOffX, Math.min(maxOffX, this.formationOffX * worldW));
+    const offY = Math.max(-maxOffY, Math.min(maxOffY, this.formationOffY * worldH));
     const size = this.curl.soul.size;
     const texels = size * size;
     const data = this.targetData!;
@@ -447,8 +476,8 @@ export class ParticleScene {
       const pix = lit[(assign[i] * n) | 0];
       const px = pix % STAGE_W;
       const py = (pix / STAGE_W) | 0;
-      data[i * 4] = (px / STAGE_W - 0.5) * stageW + jitter[i * 3];
-      data[i * 4 + 1] = -(py / STAGE_H - 0.5) * stageH + jitter[i * 3 + 1];
+      data[i * 4] = (px / STAGE_W - 0.5) * stageW + offX + jitter[i * 3];
+      data[i * 4 + 1] = -(py / STAGE_H - 0.5) * stageH + offY + jitter[i * 3 + 1];
       data[i * 4 + 2] = jitter[i * 3 + 2];
     }
     this.targetTexture!.needsUpdate = true;
@@ -661,6 +690,11 @@ export class ParticleScene {
       this.soulUniforms.targetStrength.value =
         ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 2.2 : 3.0));
 
+      // Held formations dim their palette glow so dense shapes read as color
+      // instead of blooming to white (the DARREN theme has glow 0 already).
+      this.bodyUniforms.uFormationGlow.value =
+        1 - 0.85 * (this.soulUniforms.targetStrength.value as number);
+
       // Release-burst decay (~1s)
       if (this.burst > 0.001) {
         this.burst *= Math.pow(0.12, dT);
@@ -668,6 +702,11 @@ export class ParticleScene {
         this.burst = 0;
       }
       this.soulUniforms.burstStrength.value = this.burst;
+
+      // Ease the formation offset toward its per-slide goal (~0.4s)
+      const offK = Math.min(1, dT * 2.5);
+      this.formationOffX += (this.formationGoalX - this.formationOffX) * offK;
+      this.formationOffY += (this.formationGoalY - this.formationOffY) * offK;
 
       // Card deflection strength tween
       const cs = this.soulUniforms.cardStrength.value as number;

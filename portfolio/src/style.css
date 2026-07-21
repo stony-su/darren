@@ -25,17 +25,14 @@ body {
   display: none;
 }
 
-/* ── Intro Line Animations ── */
+/* ── Intro: curved per-letter text ── */
 
-.intro-line {
-  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              filter 0.6s ease;
-  will-change: opacity, transform, filter;
+.arc-line {
+  /* The static per-slide offset lives in the inline transform; the letters
+     animate individually, so the wrapper itself never transitions. */
+  will-change: transform;
 }
 
-/* Curved intro text: sentences ride an SVG arc pinned to the top or bottom
-   band, leaving the center stage to the particle choreography. */
 .intro-curve {
   display: block;
   margin: 0 auto;
@@ -44,78 +41,55 @@ body {
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
-.intro-curve text {
-  letter-spacing: 0.04em;
-}
-
-/* Sticker pop-in base */
-.sticker {
+/* Per-letter telekinetic assemble / scatter. The parent <g> handles arc
+   placement; the inner <text> animates in its own local space, so letters
+   fly in along the direction they sit on the curve. */
+.intro-glyph text {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transform: translateY(30px) scale(0.55);
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.5s ease;
   will-change: transform, opacity;
+  letter-spacing: 0.01em;
+}
+.arc-line.is-active .intro-glyph text {
+  opacity: 1;
+  transform: none;
+}
+.arc-line.is-exit .intro-glyph text {
+  opacity: 0;
+  transform: translateY(-26px) scale(0.8);
 }
 
-.sticker img {
-  transition: box-shadow 0.3s ease;
+/* ── Intro: persistent image frames (telekinetic flight) ──
+   One shared pool of frames drifts from one slide's layout to the next and
+   cross-fades its photo mid-flight, instead of popping in and out. */
+.intro-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 3px solid var(--accent-border);
+  box-shadow: var(--glow-shadow);
+  opacity: 0;
+  transition: transform 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              width 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.55s ease,
+              border-color 0.6s ease,
+              box-shadow 0.6s ease;
+  will-change: transform, width, height, opacity;
 }
-
-/* Rise up */
-.intro-line-rise {
-  transform: translateY(30px);
-}
-.intro-line-rise.intro-line-active {
-  transform: translateY(0);
-}
-.intro-line-rise.intro-line-exit {
-  transform: translateY(-20px);
-}
-
-/* Letter spacing expand */
-.intro-line-letter {
-  letter-spacing: -0.02em;
-  transform: scale(0.96);
-}
-.intro-line-letter.intro-line-active {
-  letter-spacing: 0.15em;
-  transform: scale(1);
-}
-.intro-line-letter.intro-line-exit {
-  letter-spacing: 0.3em;
-  opacity: 0 !important;
-}
-
-/* Scale in */
-.intro-line-scale {
-  transform: scale(0.85);
-}
-.intro-line-scale.intro-line-active {
-  transform: scale(1);
-}
-.intro-line-scale.intro-line-exit {
-  transform: scale(1.05);
-}
-
-/* Slide from right */
-.intro-line-slide {
-  transform: translateX(60px);
-}
-.intro-line-slide.intro-line-active {
-  transform: translateX(0);
-}
-.intro-line-slide.intro-line-exit {
-  transform: translateX(-60px);
-}
-
-/* Blur unblur */
-.intro-line-blur {
-  filter: blur(12px);
-  transform: scale(1.05);
-}
-.intro-line-blur.intro-line-active {
-  filter: blur(0px);
-  transform: scale(1);
-}
-.intro-line-blur.intro-line-exit {
-  filter: blur(8px);
-  transform: scale(0.97);
+.intro-frame-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.6s ease;
 }
 
 /* ── Project Card Animations ── */
