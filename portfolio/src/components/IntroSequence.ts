@@ -2,7 +2,7 @@ import { ParticleScene } from '../animation/scene';
 import {
   darrenDrawer,
   codeGlyphDrawer,
-  openBookDrawer,
+  glassesDrawer,
   iceSkateDrawer,
   paperPlaneDrawer,
 } from '../animation/IntroChoreography';
@@ -133,7 +133,7 @@ const INTRO_LINES: IntroLine[] = [
   {
     text: "And when I'm not, you can find me reading…",
     railLabel: 'Reading',
-    makeDrawer: openBookDrawer,
+    makeDrawer: glassesDrawer,
     arc: {
       viewBox: '0 0 1300 300',
       path: 'M 40 165 C 330 95 620 220 900 150 S 1180 120 1270 160',

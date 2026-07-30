@@ -46,7 +46,7 @@ export function darrenDrawer(): TargetDrawer {
   };
 }
 
-/* ══════════ Slide 1 — "I code websites" : </> glyph, breathing ══════════ */
+/* ══════════ Slide 1 — "I code websites" : </> glyph, still ══════════ */
 
 export function codeGlyphDrawer(): TargetDrawer {
   const cx = STAGE_W / 2;
@@ -56,15 +56,9 @@ export function codeGlyphDrawer(): TargetDrawer {
   const gap = 298; // apex distance from center — spread wide so the three
   //                  marks read as distinct strokes, not one dense blob.
 
-  return (ctx, t) => {
-    // Very slow, small breathing so particles mostly settle (settled particles
-    // show palette color; constantly-moving ones glow white and bloom out).
-    const s = 1 + 0.03 * Math.sin(t * 0.5);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(s, s);
-    ctx.translate(-cx, -cy);
-
+  // Still object (no idle): drawn identically every frame so particles settle
+  // and hold crisp, exactly like the DARREN wordmark.
+  return (ctx) => {
     // Stroke weight is tuned so the lit-pixel count (hence particle density)
     // lands near DARREN's — thin strokes overpack particles and whiteout.
     ctx.strokeStyle = '#fff';
@@ -91,78 +85,67 @@ export function codeGlyphDrawer(): TargetDrawer {
     ctx.moveTo(cx - 84, cy + h);
     ctx.lineTo(cx + 84, cy - h);
     ctx.stroke();
-
-    ctx.restore();
   };
 }
 
-/* ══════════ Slide 2 — reading : open book, pages flutter ══════════ */
+/* ══════════ Slide 2 — reading : reading glasses (still) ══════════ */
 
-export function openBookDrawer(): TargetDrawer {
+export function glassesDrawer(): TargetDrawer {
   const cx = STAGE_W / 2;
   const cy = STAGE_H / 2;
+  const R = 100; // lens radius
+  const off = 162; // lens center offset from center
 
-  return (ctx, t) => {
-    // Subtle, slow flutter so particles settle into color instead of glowing.
-    const fL = Math.sin(t * 0.5) * 6;
-    const fR = Math.sin(t * 0.5 + 1.1) * 6;
-
+  // Still object (no idle). Two lens rings + bridge + temple arms read as
+  // reading glasses; the ring interiors are the negative space that keeps it
+  // from collapsing into two solid discs.
+  return (ctx) => {
     ctx.strokeStyle = '#fff';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Thick page outlines (medium weight → DARREN-like density → dim & legible)
-    // with a dark interior; the negative space is what reads as an open book.
-    ctx.lineWidth = 24;
+    // Lens rings
+    ctx.lineWidth = 26;
     ctx.beginPath();
-    ctx.moveTo(cx - 16, cy - 56);
-    ctx.quadraticCurveTo(cx - 176, cy - 104 + fL, cx - 336, cy - 62 + fL);
-    ctx.lineTo(cx - 316, cy + 96 + fL * 0.5);
-    ctx.quadraticCurveTo(cx - 176, cy + 122, cx - 16, cy + 98);
-    ctx.closePath();
+    ctx.arc(cx - off, cy + 6, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + off, cy + 6, R, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(cx + 16, cy - 56);
-    ctx.quadraticCurveTo(cx + 176, cy - 104 + fR, cx + 336, cy - 62 + fR);
-    ctx.lineTo(cx + 316, cy + 96 + fR * 0.5);
-    ctx.quadraticCurveTo(cx + 176, cy + 122, cx + 16, cy + 98);
-    ctx.closePath();
-    ctx.stroke();
-
-    // Spine
+    // Bridge over the nose (hump between the inner lens edges)
     ctx.lineWidth = 22;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 54);
-    ctx.lineTo(cx, cy + 96);
+    ctx.moveTo(cx - off + R - 6, cy - 6);
+    ctx.quadraticCurveTo(cx, cy - 58, cx + off - R + 6, cy - 6);
+    ctx.stroke();
+
+    // Temple arms splaying out from the outer edges
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.moveTo(cx - off - R + 8, cy - 6);
+    ctx.quadraticCurveTo(cx - off - R - 96, cy - 30, cx - off - R - 150, cy - 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + off + R - 8, cy - 6);
+    ctx.quadraticCurveTo(cx + off + R + 96, cy - 30, cx + off + R + 150, cy - 8);
     ctx.stroke();
   };
 }
 
-/* ══════════ Slide 3 — hockey : ice skate, static + spray shimmer ══════════ */
+/* ══════════ Slide 3 — hockey : ice skate (still) ══════════ */
 
 export function iceSkateDrawer(): TargetDrawer {
   const cx = STAGE_W / 2;
   const cy = STAGE_H / 2;
 
-  return (ctx, t) => {
+  // Still object (no idle): drawn identically every frame so the boot holds
+  // crisp like the DARREN wordmark.
+  return (ctx) => {
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#fff';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    // The boot stays put so its particles settle into color; the ice-spray
-    // shimmer off the heel is the idle life.
-    const N = 6;
-    for (let k = 0; k < N; k++) {
-      const life = (t * 0.85 + k / N) % 1;
-      const sx = cx - 172 - life * 96;
-      const sy = cy + 66 + life * 22 + Math.sin(t * 5 + k) * 4;
-      const r = (1 - life) * 6 + 1.6;
-      ctx.beginPath();
-      ctx.arc(sx, sy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     // Boot outline (toe leading right, heel back-left)
     ctx.lineWidth = 30;
