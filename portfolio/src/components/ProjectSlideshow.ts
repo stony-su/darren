@@ -172,6 +172,9 @@ export class ProjectSlideshow {
     const isEdge = index === 0 || index === this.slideCount - 1;
 
     this.scene.setTheme(this.themeForSlide(index));
+    // Project slides always use their theme's bloom (the intro's last line
+    // zeroes it, and that must not carry over).
+    this.scene.setBloomOverride(null);
     this.scene.setAttract(isEdge);
     // Project-card slides gather the field into curl filament lines
     this.scene.setLineMode(!isEdge);

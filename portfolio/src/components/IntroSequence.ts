@@ -63,6 +63,9 @@ interface IntroLine {
   /** Fraction of particles that form the shape (default 0.45). Compact icon
    *  slides run lower so the shape stays sparse and colorful, not a white blob. */
   participation?: number;
+  /** Bloom strength for this slide, overriding the theme's (undefined = theme
+   *  default). Slides whose formation blows out to white run 0. */
+  bloom?: number;
   theme: number;
   fontStyle: 'display' | 'body';
 }
@@ -179,6 +182,7 @@ const INTRO_LINES: IntroLine[] = [
     },
     anchor: { top: '4vh' },
     formationOffset: [0, 0],
+    bloom: 0,
     theme: 4,
     fontStyle: 'display',
     slots: [],
@@ -259,6 +263,7 @@ export class IntroSequence {
     this.scene.setTargetDrawer(INTRO_LINES[startLine].makeDrawer());
     this.scene.setFormationOffset(...INTRO_LINES[startLine].formationOffset);
     this.scene.setFormationParticipation(INTRO_LINES[startLine].participation ?? 0.45);
+    this.scene.setBloomOverride(INTRO_LINES[startLine].bloom ?? null);
 
     /* Scroll spacer — one viewport height per line plus buffer. */
     const spacer = document.createElement('div');
@@ -551,6 +556,7 @@ export class IntroSequence {
     this.scene.setTheme(line.theme);
     this.scene.setFormationOffset(...line.formationOffset);
     this.scene.setFormationParticipation(line.participation ?? 0.45);
+    this.scene.setBloomOverride(line.bloom ?? null);
 
     /* Swap in the slide's choreography; let the release burst breathe for a
        beat before the cloud regathers when arriving from another slide. */

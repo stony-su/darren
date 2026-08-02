@@ -57,6 +57,7 @@ export class ParticleScene {
   // Playground / interaction state
   private speedMultiplier = 1;
   private bloomMult = 1;
+  private bloomOverride: number | null = null;
   private trailOverride: number | null = null;
   private panelMouseMode: MouseMode = 'auto';
   private autoAttract = false;
@@ -558,6 +559,14 @@ export class ParticleScene {
     this.bloomMult = m;
   }
 
+  /** Replace the current theme's bloom strength (null = back to the theme's
+   *  own value). For slides whose formation blooms out even though the theme
+   *  suits the rest of the scene; themes are shared with project slides, so
+   *  they can't be retuned per intro line. */
+  setBloomOverride(strength: number | null): void {
+    this.bloomOverride = strength;
+  }
+
   setParticleCount(count: number | null): void {
     this.userCount = count;
     this.rebuildCurl(count ?? TIER_COUNTS[this.tier]);
@@ -666,7 +675,7 @@ export class ParticleScene {
       if (this.post.active) {
         const target = theme.bloom;
         const cur = this.post.getBloomStrength();
-        const goal = target.strength * this.bloomMult;
+        const goal = (this.bloomOverride ?? target.strength) * this.bloomMult;
         this.post.setBloom(cur + (goal - cur) * Math.min(1, dT * 3), target.radius, target.threshold);
         this.post.setDamp(this.trailOverride ?? theme.afterimageDamp);
       }
