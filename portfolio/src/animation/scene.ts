@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Curl } from './Curl';
 import { createFeatherGeometry } from './Feather';
 import { PostPipeline } from './PostPipeline';
-import { STAGE_W, STAGE_H } from './IntroChoreography';
+import { STAGE_W, STAGE_H, knotDrawer } from './IntroChoreography';
 import type { TargetDrawer } from './IntroChoreography';
 import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
@@ -93,6 +93,7 @@ export class ParticleScene {
   private fontsReady = false;
   private targetStrengthGoal = 0;
   private burst = 0;
+  private shock = 0;
 
   // Off-center formation placement (fractions of the visible world), eased.
   private formationGoalX = 0;
@@ -160,8 +161,11 @@ export class ParticleScene {
       cardStrength: { value: 0.0 },
       windDir: { value: new THREE.Vector3(0, 0, 0) },
       burstStrength: { value: 0.0 },
+      shockCenter: { value: new THREE.Vector3(0, 0, 0) },
+      shockStrength: { value: 0.0 },
       uTime: { value: 0.0 },
       lineStrength: { value: 0.0 },
+      speedSpread: { value: 0.0 },
     };
 
     const theme0 = THEMES[0];
@@ -380,9 +384,13 @@ export class ParticleScene {
   /** Ramp particle formation on/off. */
   setTextFormation(active: boolean): void {
     // Releasing a held formation fires a scatter burst so the shapes
-    // dissolve into the flow instead of lingering as a dense cluster.
+    // dissolve into the flow instead of lingering as a dense cluster, plus a
+    // shockwave centered on the shape so it visibly blows apart first.
     if (!active && this.targetStrengthGoal > 0 && this.hasTargets) {
       this.burst = 1;
+      const { offX, offY } = this.formationStage();
+      (this.soulUniforms.shockCenter.value as THREE.Vector3).set(offX, offY, 0);
+      this.shock = 1;
       // Flush bright trails so the dissolve doesn't smear into a whiteout
       this.post.kickDamp(0.45, 1200);
     }
@@ -442,6 +450,24 @@ export class ParticleScene {
     }
   }
 
+  /** World-space placement of the formation stage: size, plus the eased
+   *  offset clamped so the shape can never leave the frame. Shared by target
+   *  rasterization and the transition shockwave, so the burst is centered on
+   *  the shape that just let go. */
+  private formationStage(): { offX: number; offY: number; stageW: number; stageH: number } {
+    const { w: worldW, h: worldH } = this.worldSizeAtZ0();
+    const stageW = Math.min(2.7, worldW * 0.9);
+    const stageH = stageW * (STAGE_H / STAGE_W);
+    const maxOffX = Math.max(0, worldW * 0.5 - stageW * 0.5 - worldW * 0.04);
+    const maxOffY = Math.max(0, worldH * 0.5 - stageH * 0.5 - worldH * 0.04);
+    return {
+      offX: Math.max(-maxOffX, Math.min(maxOffX, this.formationOffX * worldW)),
+      offY: Math.max(-maxOffY, Math.min(maxOffY, this.formationOffY * worldH)),
+      stageW,
+      stageH,
+    };
+  }
+
   /** Draw the active drawer's current frame and pack lit pixels into the
    *  target texture. The canvas maps to a fixed centered world rect, so
    *  drawers compose against a stable stage. */
@@ -460,14 +486,7 @@ export class ParticleScene {
     }
     if (n === 0) return; // blank frame — hold the previous targets
 
-    const { w: worldW, h: worldH } = this.worldSizeAtZ0();
-    const stageW = Math.min(2.7, worldW * 0.9);
-    const stageH = stageW * (STAGE_H / STAGE_W);
-    // Keep the (possibly offset) shape fully inside the frame.
-    const maxOffX = Math.max(0, worldW * 0.5 - stageW * 0.5 - worldW * 0.04);
-    const maxOffY = Math.max(0, worldH * 0.5 - stageH * 0.5 - worldH * 0.04);
-    const offX = Math.max(-maxOffX, Math.min(maxOffX, this.formationOffX * worldW));
-    const offY = Math.max(-maxOffY, Math.min(maxOffY, this.formationOffY * worldH));
+    const { offX, offY, stageW, stageH } = this.formationStage();
     const size = this.curl.soul.size;
     const texels = size * size;
     const data = this.targetData!;
@@ -549,6 +568,30 @@ export class ParticleScene {
 
   setNoiseSize(n: number): void {
     this.soulUniforms.noiseSize.value = n;
+  }
+
+  /** Playground preset: pull the field into a trefoil-knot formation, or
+   *  release it. Uses the same drawer/spring machinery as the intro slides,
+   *  so releasing fires the usual scatter + shockwave. Participation is kept
+   *  low — packing the whole field onto thin strands overflows them and the
+   *  knot fills in as a solid blob. */
+  setGatherPreset(enabled: boolean): void {
+    if (enabled) {
+      this.setFormationOffset(0, 0);
+      this.setFormationParticipation(0.16);
+      this.setTargetDrawer(knotDrawer());
+      this.setTextFormation(true);
+    } else {
+      this.setTextFormation(false);
+      this.drawer = null;
+    }
+  }
+
+  /** Give each particle its own speed, drawn on a bell curve spanning
+   *  0.1x..10x of the sim speed (off = everything runs at one speed). With
+   *  swirl lines on, the draw is per chain so a filament stays one object. */
+  setRandomSpeed(enabled: boolean): void {
+    this.soulUniforms.speedSpread.value = enabled ? 1 : 0;
   }
 
   setTrailOverride(damp: number | null): void {
@@ -711,6 +754,16 @@ export class ParticleScene {
         this.burst = 0;
       }
       this.soulUniforms.burstStrength.value = this.burst;
+
+      // Shockwave decay (~0.4s). Deliberately much shorter than the burst:
+      // the scatter has to be spent by the time the next formation gathers,
+      // or the shapes fight the spring pulling them back in.
+      if (this.shock > 0.001) {
+        this.shock *= Math.pow(0.0004, dT);
+      } else {
+        this.shock = 0;
+      }
+      this.soulUniforms.shockStrength.value = this.shock;
 
       // Ease the formation offset toward its per-slide goal (~0.4s)
       const offK = Math.min(1, dT * 2.5);

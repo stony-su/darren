@@ -92,8 +92,12 @@ async function main() {
       () => {
         intro = null;
         // Jumping straight to a project slide: spread the center-clustered
-        // field first, or it sits glowing behind the card for seconds.
-        if (pendingSlide > 0) particleScene.seedSpread();
+        // field first, or it sits glowing behind the card for seconds. The
+        // edge slides (Work / Contact) have no card, so skip the reseed there
+        // and let the formation the intro was holding disperse on its own —
+        // reseeding reads as every particle teleporting at once.
+        const isEdgeSlide = pendingSlide === 0 || pendingSlide === SLUGS.length - 1;
+        if (!isEdgeSlide) particleScene.seedSpread();
         showSlideshow(pendingSlide);
       },
       (i) => rail.setActive(i)

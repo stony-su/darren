@@ -273,3 +273,101 @@ export function paperPlaneDrawer(): TargetDrawer {
     ctx.restore();
   };
 }
+
+/* ══════════ Playground preset — trefoil knot ══════════ */
+
+/**
+ * Static trefoil knot for the playground's Gather preset (not an intro slide).
+ *
+ * Strands weave properly: the curve is split into runs by the sign of its
+ * depth, the under-runs are painted first, then each over-run punches a gap
+ * through whatever is already there before painting itself. The punch is
+ * inset from the run's ends so it bites the crossings rather than the
+ * z-zero junctions where an over-run meets its own under-run.
+ *
+ * Static by design — a moving target keeps the springs chasing and the shape
+ * blurs into its own convex hull instead of settling onto the strands.
+ */
+export function knotDrawer(): TargetDrawer {
+  const N = 900;
+  const raw: { x: number; y: number; z: number }[] = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    raw.push({
+      x: Math.sin(a) + 2 * Math.sin(2 * a),
+      y: Math.cos(a) - 2 * Math.cos(2 * a),
+      z: -Math.sin(3 * a),
+    });
+  }
+
+  let maxX = 0;
+  let maxY = 0;
+  for (const p of raw) {
+    maxX = Math.max(maxX, Math.abs(p.x));
+    maxY = Math.max(maxY, Math.abs(p.y));
+  }
+  const scale = Math.min((STAGE_W * 0.44) / maxX, (STAGE_H * 0.42) / maxY);
+  const pts = raw.map((p) => ({
+    x: STAGE_W / 2 + p.x * scale,
+    y: STAGE_H / 2 - p.y * scale,
+    z: p.z,
+  }));
+
+  // Contiguous runs of constant depth sign, walked from the first sign change
+  // so no run is split across the array seam.
+  const runs: { pts: typeof pts; over: boolean }[] = [];
+  let start = 0;
+  while (start < N && Math.sign(pts[start].z) === Math.sign(pts[(start + N - 1) % N].z)) start++;
+  let cur: typeof pts = [];
+  let curOver = pts[start % N].z > 0;
+  for (let k = 0; k <= N; k++) {
+    const p = pts[(start + k) % N];
+    const over = p.z > 0;
+    if (over !== curOver && cur.length) {
+      cur.push(p); // carry one point so runs join without a seam
+      runs.push({ pts: cur, over: curOver });
+      cur = [];
+      curOver = over;
+    }
+    cur.push(p);
+  }
+  if (cur.length > 1) runs.push({ pts: cur, over: curOver });
+
+  const W = 16; // strand thickness
+  const GAP = 14; // extra width of the punch that reads as "passes under"
+
+  const trace = (ctx: CanvasRenderingContext2D, run: typeof pts, inset: number) => {
+    const a = Math.floor(run.length * inset);
+    const b = Math.ceil(run.length * (1 - inset));
+    if (b - a < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(run[a].x, run[a].y);
+    for (let i = a + 1; i < b; i++) ctx.lineTo(run[i].x, run[i].y);
+    ctx.stroke();
+  };
+
+  return (ctx) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#fff';
+
+    for (const r of runs) {
+      if (r.over) continue;
+      ctx.lineWidth = W;
+      trace(ctx, r.pts, 0);
+    }
+
+    for (const r of runs) {
+      if (!r.over) continue;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = W + GAP;
+      trace(ctx, r.pts, 0.18);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = W;
+      trace(ctx, r.pts, 0);
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  };
+}

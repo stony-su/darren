@@ -317,7 +317,7 @@ export class IntroSequence {
     document.fonts?.ready.then(() => this.layoutAllLines());
 
     if (immediate || startLine > 0) {
-      window.scrollTo({ top: startLine * window.innerHeight, behavior: 'auto' });
+      this.jumpToLine(startLine);
       this.showLine(startLine);
       window.addEventListener('scroll', this.boundScrollHandler, { passive: true });
       window.addEventListener('resize', this.boundResizeHandler);
@@ -345,9 +345,24 @@ export class IntroSequence {
   goToLine(index: number): void {
     if (this.completed) return;
     const clamped = Math.max(0, Math.min(INTRO_LINES.length - 1, index));
-    const behavior: ScrollBehavior =
-      Math.abs(clamped - Math.max(0, this.activeIndex)) > 1 ? 'auto' : 'smooth';
-    window.scrollTo({ top: clamped * window.innerHeight, behavior });
+    if (Math.abs(clamped - Math.max(0, this.activeIndex)) > 1) {
+      // Long jumps land instantly: a smooth scroll crosses every viewport in
+      // between, and each one forms (then dissolves) its line for a few frames.
+      this.jumpToLine(clamped);
+    } else {
+      window.scrollTo({ top: clamped * window.innerHeight, behavior: 'smooth' });
+    }
+  }
+
+  /** Scroll straight to a line with no animation. `behavior: 'auto'` is not
+   *  enough — it defers to `html { scroll-behavior: smooth }`, so the CSS has
+   *  to be suppressed for the assignment. */
+  private jumpToLine(index: number): void {
+    const root = document.documentElement;
+    const prev = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    window.scrollTo(0, index * window.innerHeight);
+    root.style.scrollBehavior = prev;
   }
 
   /** Skip the rest of the intro (used by the timeline's slide dots). */

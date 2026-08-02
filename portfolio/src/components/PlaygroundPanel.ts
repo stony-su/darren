@@ -19,6 +19,9 @@ const LINE_MODE_LABELS: Record<LineMode, string> = {
   off: 'Off',
 };
 
+/** Sim speed the Gather preset runs at, so the knot forms up in a beat. */
+const GATHER_SPEED = 10;
+
 const COUNT_OPTIONS: { label: string; value: number | null }[] = [
   { label: 'Auto', value: null },
   { label: '10,000', value: 10000 },
@@ -38,6 +41,8 @@ export class PlaygroundPanel {
   private gear: HTMLButtonElement | null = null;
   private open = false;
   private ac = new AbortController();
+  /** Speed to hand back when the Gather preset is switched off. */
+  private speedBeforeGather = DEFAULT_SETTINGS.speed;
 
   constructor(scene: ParticleScene) {
     this.scene = scene;
@@ -107,7 +112,12 @@ export class PlaygroundPanel {
 
         <div class="pg-row">
           <label for="pg-speed" class="font-body">Speed <span class="pg-value" id="pg-speed-value">${s.speed.toFixed(2)}x</span></label>
-          <input type="range" id="pg-speed" min="0.1" max="3" step="0.05" value="${s.speed}" />
+          <input type="range" id="pg-speed" min="0.1" max="10" step="0.05" value="${s.speed}" />
+        </div>
+
+        <div class="pg-row pg-row-inline">
+          <span class="font-body" title="Give every particle its own speed, on a bell curve from 0.1x to 10x. Swirl-line filaments each move as one object.">Random speed</span>
+          <button type="button" id="pg-random-speed" class="pg-btn font-body">${s.randomSpeed ? 'On' : 'Off'}</button>
         </div>
 
         <div class="pg-row">
@@ -122,6 +132,15 @@ export class PlaygroundPanel {
       </div>
 
       <div class="pg-section" style="--s: 1">
+        <h4 class="pg-section-title font-body">Presets</h4>
+
+        <div class="pg-row pg-row-inline">
+          <span class="font-body" title="Gather the field into a trefoil knot. Runs the sim at 10x so it forms up quickly.">Gather knot</span>
+          <button type="button" id="pg-gather" class="pg-btn font-body">${s.gather ? 'On' : 'Off'}</button>
+        </div>
+      </div>
+
+      <div class="pg-section" style="--s: 2">
         <h4 class="pg-section-title font-body">Interaction</h4>
 
         <div class="pg-row">
@@ -135,7 +154,7 @@ export class PlaygroundPanel {
         </div>
       </div>
 
-      <div class="pg-section" style="--s: 2">
+      <div class="pg-section" style="--s: 3">
         <h4 class="pg-section-title font-body">Rendering</h4>
 
         <div class="pg-row">
@@ -159,7 +178,7 @@ export class PlaygroundPanel {
         </div>
       </div>
 
-      <div class="pg-footer" style="--s: 3">
+      <div class="pg-footer" style="--s: 4">
         <button type="button" id="pg-reset" class="pg-btn pg-btn-wide font-body">Reset particles</button>
       </div>
     `;
@@ -167,6 +186,14 @@ export class PlaygroundPanel {
 
   private q<T extends HTMLElement>(id: string): T {
     return this.panel!.querySelector<T>('#' + id)!;
+  }
+
+  /** Set the speed setting and keep the slider + readout in step with it. */
+  private setSpeed(v: number): void {
+    this.settings.speed = v;
+    this.q<HTMLInputElement>('pg-speed').value = String(v);
+    this.q('pg-speed-value').textContent = v.toFixed(2) + 'x';
+    this.scene.setSpeedMultiplier(v);
   }
 
   private bind(): void {
@@ -177,6 +204,30 @@ export class PlaygroundPanel {
       this.settings.speed = parseFloat(speed.value);
       this.q('pg-speed-value').textContent = this.settings.speed.toFixed(2) + 'x';
       this.scene.setSpeedMultiplier(this.settings.speed);
+      this.persist();
+    });
+
+    const randomSpeed = this.q<HTMLButtonElement>('pg-random-speed');
+    randomSpeed.addEventListener('click', () => {
+      this.settings.randomSpeed = !this.settings.randomSpeed;
+      randomSpeed.textContent = this.settings.randomSpeed ? 'On' : 'Off';
+      this.scene.setRandomSpeed(this.settings.randomSpeed);
+      this.persist();
+    });
+
+    const gather = this.q<HTMLButtonElement>('pg-gather');
+    gather.addEventListener('click', () => {
+      this.settings.gather = !this.settings.gather;
+      gather.textContent = this.settings.gather ? 'On' : 'Off';
+      if (this.settings.gather) {
+        // Remember where the speed slider was, then run the sim hot so the
+        // knot assembles in a couple of seconds instead of half a minute.
+        this.speedBeforeGather = this.settings.speed;
+        this.setSpeed(GATHER_SPEED);
+      } else {
+        this.setSpeed(this.speedBeforeGather);
+      }
+      this.scene.setGatherPreset(this.settings.gather);
       this.persist();
     });
 
@@ -254,6 +305,8 @@ export class PlaygroundPanel {
   private applyAll(): void {
     const s = this.settings;
     if (s.speed !== DEFAULT_SETTINGS.speed) this.scene.setSpeedMultiplier(s.speed);
+    if (s.randomSpeed !== DEFAULT_SETTINGS.randomSpeed) this.scene.setRandomSpeed(s.randomSpeed);
+    if (s.gather) this.scene.setGatherPreset(true);
     if (s.noiseSize !== DEFAULT_SETTINGS.noiseSize) this.scene.setNoiseSize(s.noiseSize);
     if (s.mouseMode !== DEFAULT_SETTINGS.mouseMode) this.scene.setMouseMode(s.mouseMode);
     if (s.mouseStrength !== DEFAULT_SETTINGS.mouseStrength) this.scene.setMouseStrength(s.mouseStrength);

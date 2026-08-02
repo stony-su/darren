@@ -3,6 +3,8 @@ export type LineMode = 'auto' | 'on' | 'off';
 
 export interface PlaygroundSettings {
   speed: number;                // sim speed multiplier
+  randomSpeed: boolean;         // per-particle speed on a 0.1x..10x bell curve
+  gather: boolean;              // preset: pull the field into a trefoil knot (runs at 10x)
   noiseSize: number;            // curl noise scale
   mouseMode: MouseMode;         // 'auto' = slideshow decides
   mouseStrength: number;        // attract/repel force multiplier
@@ -14,6 +16,8 @@ export interface PlaygroundSettings {
 
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
   speed: 1,
+  randomSpeed: false,
+  gather: false,
   noiseSize: 1.5,
   mouseMode: 'auto',
   mouseStrength: 1,

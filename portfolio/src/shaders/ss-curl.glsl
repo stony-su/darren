@@ -20,8 +20,12 @@ uniform float cardStrength;
 uniform vec3  windDir;
 uniform float burstStrength;
 
+uniform vec3  shockCenter;
+uniform float shockStrength;
+
 uniform float uTime;
 uniform float lineStrength;
+uniform float speedSpread; // 0 = every particle runs at sim speed, 1 = full 0.1x..10x spread
 
 varying vec2 vUv;
 
@@ -38,6 +42,13 @@ float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+// Box-Muller: two uniform samples -> one standard normal. Used for the
+// randomized-speed bell curve; a plain rand() would spread speeds flat.
+float gauss(vec2 s1, vec2 s2){
+    float u1 = max(rand(s1), 1e-6);
+    return sqrt(-2.0 * log(u1)) * cos(6.28318530718 * rand(s2));
+}
+
 void main(){
 
   vec2 uv = gl_FragCoord.xy / resolution;
@@ -46,8 +57,10 @@ void main(){
 
   vec3 vel = pos.xyz - oPos.xyz;
 
-  // Time-based speed multiplier
-  float timeScale = dT * 60.0;
+  // Frame-rate normalisation. Drag and the formation hold stay on this clock;
+  // the driving forces run on `timeScale` below, which the randomized-speed
+  // option scales per particle.
+  float dampScale = dT * 60.0;
 
   // Filament-chain topology: consecutive texels form follow-the-leader
   // chains of CHAIN particles. Index 0 of each chain is the leader.
@@ -56,8 +69,31 @@ void main(){
   float idx = texel.y * texW + texel.x;
   float posInChain = mod(idx, CHAIN);
   float isLeader = 1.0 - step(0.5, posInChain);
-  float chainRand = rand(vec2(floor(idx / CHAIN) * 0.137, 4.7));
+  float chainId = floor(idx / CHAIN);
+  float chainRand = rand(vec2(chainId * 0.137, 4.7));
   float follower = lineStrength * (1.0 - isLeader);
+
+  // Randomized speed: each particle gets its own multiplier, normal in log10
+  // space centred on 1x, so the spread is a bell over 0.1x..10x — most sit near
+  // normal speed and the extremes are rare.
+  // It scales the driving forces only, NOT the drag below: drag already scales
+  // with the timestep, so multiplying both just cancels out and every particle
+  // ends up at the same terminal speed.
+  // In line mode the draw is seeded per chain, so a whole filament shares one
+  // speed and travels as a single object.
+  float speedMul = 1.0;
+  if (speedSpread > 0.0001) {
+    vec2 cs = vec2(chainId * 0.311, chainId * 0.577);
+    float g = mix(
+      gauss(uv * 3.17 + 11.3, uv * 5.41 + 27.9),
+      gauss(cs + 9.13, cs + 2.71),
+      lineStrength
+    );
+    // +/-3 sigma spans one decade each way; the clamp pins the tails to the
+    // stated 0.1x / 10x bounds instead of letting a rare sample run away.
+    speedMul = pow(10.0, clamp(g / 3.0, -1.0, 1.0) * speedSpread);
+  }
+  float timeScale = dampScale * speedMul;
 
   vec3 curl = curlNoise( pos.xyz * noiseSize );
   // Followers in line mode shed most of their individual jitter so the
@@ -79,6 +115,12 @@ void main(){
     tgt = texture2D(t_target, uv);
     participate = step(tgt.w, formationParticipation);
     arrive = clamp(targetStrength * 1.6 - fract(tgt.w * 7.0) * 0.5, 0.0, 1.0) * participate;
+    // A shockwave overrides the formation hold. Without this the settle
+    // damping further down (x0.80/frame while arrive is high) eats the kick
+    // on the very frames it is strongest, and the shape only swells a little
+    // instead of coming apart. The spring returns as the wave fades, which is
+    // what pulls the particles back into the next shape.
+    arrive *= 1.0 - smoothstep(0.05, 0.45, shockStrength);
   }
 
   // Center exclusion zone — particles physically repelled from origin.
@@ -130,7 +172,10 @@ void main(){
       vec3 flow = curlNoise(pos.xyz * noiseSize * 0.55 + vec3(chainRand * 19.0, 7.0, 3.0));
       flow.z *= 0.35; // keep the lines swirling mostly in the screen plane
       vec3 flowDir = normalize(flow + vec3(1e-5));
-      float cruise = 0.0032 * (0.7 + 0.6 * chainRand);
+      // Cruise is an absolute target speed, so the per-chain multiplier has to
+      // scale it directly — steering toward a fixed magnitude would otherwise
+      // pin every filament to the same speed no matter its draw.
+      float cruise = 0.0032 * (0.7 + 0.6 * chainRand) * speedMul;
       vec3 steered = mix(vel, flowDir * cruise, clamp(0.10 * timeScale, 0.0, 1.0));
       vel = mix(vel, steered, lineStrength);
     } else {
@@ -143,8 +188,10 @@ void main(){
         // the follower's velocity converges to the closing speed instead of
         // integrating a spring (which winds up and explodes the field).
         // The repulsion floor keeps coiled chains from knotting into blobs.
+        // Scaled too, or the closing speed caps out below a fast leader's
+        // cruise and the chain stretches until it snaps apart.
         float pull = clamp(d - 0.014, -0.03, 0.03);
-        vec3 chase = (toPrev / d) * pull * 0.25;
+        vec3 chase = (toPrev / d) * pull * 0.25 * speedMul;
         vec3 followVel = mix(vel, chase, clamp(0.25 * timeScale, 0.0, 1.0));
         vel = mix(vel, followVel, follower);
       }
@@ -170,9 +217,11 @@ void main(){
   // Text-formation target attraction: spring toward per-particle target,
   // staggered by the target texel's random w, with settle damping so the
   // letters hold still once formed.
+  // Held on dampScale, not the per-particle clock: a formation's job is to hit
+  // its target and stay put, and a 10x spring here just rings around it.
   if (arrive > 0.001) {
-    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * timeScale;
-    vel *= mix(1.0, pow(0.80, timeScale), arrive * 0.9);
+    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * dampScale;
+    vel *= mix(1.0, pow(0.80, dampScale), arrive * 0.9);
   }
 
   // Release burst: scatter + recede into depth so a held formation dissolves
@@ -183,7 +232,27 @@ void main(){
     vel += (scatter * 0.001 + vec3(0.0, 0.0, -0.002)) * burstStrength * timeScale;
   }
 
-  vel *= pow(.97, timeScale); // dampening
+  // Transition shockwave: a point repulsion at the released shape's center,
+  // fired for a fraction of a second so one formation blows apart outward
+  // before the next gathers, instead of the two cross-dissolving. Pushed
+  // mostly across the screen plane — a straight radial kick throws a wall of
+  // particles at the lens, which just blooms white.
+  if (shockStrength > 0.001) {
+    vec3 away = pos.xyz - shockCenter;
+    away.z *= 0.3;
+    float d = length(away);
+    // Speed grows with distance from the center, so the shape expands
+    // self-similarly and thins out. A distance-falloff kick does the opposite:
+    // the inner particles overtake the outer ones and compress the silhouette
+    // into a dense shell that just blooms white.
+    // `reach` confines the wave to the shape's neighborhood; the small
+    // radial term gives particles sitting near the center somewhere to go.
+    float reach = smoothstep(1.7, 0.15, d);
+    vec3 dir = away / max(d, 1e-4);
+    vel += (away + dir * 0.22) * reach * shockStrength * 0.115 * timeScale;
+  }
+
+  vel *= pow(.97, dampScale); // dampening
 
   vec3 p = pos.xyz + vel;
 
