@@ -539,7 +539,8 @@ body {
   .pg-panel .pg-head,
   .pg-panel .pg-sub,
   .pg-panel .pg-section,
-  .pg-panel .pg-footer {
+  .pg-panel .pg-footer,
+  .md-opt {
     transition-duration: 0.01s;
     transition-delay: 0s;
   }
@@ -550,9 +551,24 @@ body {
   cursor: pointer;
   transition:
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    right 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.3s ease,
     border-color 0.3s ease,
     background 0.3s ease;
+}
+
+/* An open sheet would otherwise sit on top of both toggles, so they ride out
+   in front of it — that's what lets you hop straight from one panel to the
+   other. Only above the width where the sheet stops being 88vw; below it,
+   there is nowhere left to ride out to. */
+@media (min-width: 420px) {
+  .panel-open .pg-gear {
+    right: calc(1.5rem + 340px);
+  }
+
+  .panel-open .md-orb {
+    right: calc(5rem + 340px);
+  }
 }
 
 .pg-gear:hover,
@@ -772,6 +788,100 @@ body {
 
 .pg-select option {
   background: #14141f;
+}
+
+/* ── Modes sidebar (shares the playground panel's chrome) ── */
+.md-orb {
+  /* One slot left of the gear: 1.5rem edge + 2.75rem button + 0.75rem gap */
+  right: 5rem;
+}
+
+.md-orb.open {
+  /* Beats .pg-gear.open's rotate — a gear turns, a star swells */
+  transform: scale(1.12);
+}
+
+.md-note {
+  margin: -6px 0 14px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.md-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 11px 13px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.15s ease;
+}
+
+.md-opt:last-child {
+  margin-bottom: 0;
+}
+
+.md-opt:hover,
+.md-opt:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent-border);
+}
+
+.md-opt:active {
+  transform: scale(0.985);
+}
+
+.md-opt[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--accent-border);
+  box-shadow: var(--glow-shadow);
+}
+
+.md-opt-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.md-opt[aria-pressed='true'] .md-opt-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.md-opt-text {
+  display: block;
+}
+
+.md-opt-name {
+  display: block;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.md-opt[aria-pressed='true'] .md-opt-name {
+  color: var(--accent);
+}
+
+.md-opt-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* ── Subtle grain overlay for depth ── */

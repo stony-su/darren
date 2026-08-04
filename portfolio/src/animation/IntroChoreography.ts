@@ -274,6 +274,54 @@ export function paperPlaneDrawer(): TargetDrawer {
   };
 }
 
+/* ══════════ Playground preset — supernova core ══════════ */
+
+/** Eight-point star: [angle, tip distance, base half-width]. */
+const STAR_SPIKES: [number, number, number][] = [
+  [0, 300, 32],
+  [Math.PI, 300, 32],
+  [Math.PI / 2, 196, 28],
+  [-Math.PI / 2, 196, 28],
+  [Math.PI / 4, 124, 20],
+  [(3 * Math.PI) / 4, 124, 20],
+  [(-3 * Math.PI) / 4, 124, 20],
+  [-Math.PI / 4, 124, 20],
+];
+
+/**
+ * The star the Supernova preset collapses into, before it blows up.
+ *
+ * Static by design (see the module header): a still target lets the springs
+ * settle, so the core reads as a hard bright disc with clean rays instead of a
+ * smudge. The rays matter for more than the silhouette — they spread the
+ * participating particles over ~5x the lit pixels a bare disc would offer, so
+ * the core is dense-and-bright rather than a solid white saucer.
+ */
+export function starCoreDrawer(): TargetDrawer {
+  const cx = STAGE_W / 2;
+  const cy = STAGE_H / 2;
+  const R = 54; // core radius
+
+  return (ctx) => {
+    ctx.fillStyle = '#fff';
+
+    for (const [a, len, halfW] of STAR_SPIKES) {
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(cx + c * len, cy + s * len); // tip
+      ctx.lineTo(cx - s * halfW, cy + c * halfW); // base, one side
+      ctx.lineTo(cx + s * halfW, cy - c * halfW); // base, other side
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+  };
+}
+
 /* ══════════ Playground preset — trefoil knot ══════════ */
 
 /**

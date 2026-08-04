@@ -6,6 +6,8 @@ uniform sampler2D t_ooPos;
 uniform float uSnowflake;
 uniform float uStretch;
 uniform float uLineStrength;
+uniform float uAttractor;
+uniform float uHole;
 
 varying vec3 vNorm;
 varying vec2 vLookup;
@@ -17,16 +19,27 @@ void main(){
   vLookup = lookup;
 
   // instance position from GPGPU textures
-  vec3 iPos   = texture2D( t_pos   , lookup ).xyz;
-  vec3 ioPos  = texture2D( t_oPos  , lookup ).xyz;
+  vec4 pT  = texture2D( t_pos   , lookup );
+  vec4 oT  = texture2D( t_oPos  , lookup );
+  vec3 iPos   = pT.xyz;
+  vec3 ioPos  = oT.xyz;
   vec3 iooPos = texture2D( t_ooPos , lookup ).xyz;
 
   // velocity-based rotation matrix (guarded against zero-length deltas so
   // near-still particles — e.g. holding a text formation — never go NaN)
-  vec3 d1 = iPos  - ioPos;
-  vec3 d2 = ioPos - iooPos;
+  // The w channel is 0 on a position the sim wrote from nowhere rather than
+  // integrated (a black-hole horizon respawn); differencing across one of
+  // those gives a stage-wide delta, which would flash the particle stretched
+  // to its cap and glowing on the frame it reappears. Drop those deltas.
+  vec3 d1 = ( iPos  - ioPos  ) * step( 0.5, pT.w );
+  vec3 d2 = ( ioPos - iooPos ) * step( 0.5, oT.w );
 
   vSpeed = length( d1 );
+
+  // Filament lines, attractor mode and black-hole mode all move particles
+  // along smooth, nearly straight paths, which is exactly what the legacy
+  // frame below can't render — so they share one rig blend.
+  float rig = max( uLineStrength, max( uAttractor, uHole ) );
 
   vec3 z = vSpeed > 1e-8 ? normalize( d1 ) : vec3( 0.0, 0.0, 1.0 );
   vec3 xr = cross( z , normalize( d2 + vec3( 1e-7 ) ) );
@@ -35,7 +48,7 @@ void main(){
   // random orientations (confetti normals along the lines) — so lines use a
   // stable reference frame. Chaos mode keeps the noisy axes: their shimmer
   // is what makes dense formations (DARREN) glow white-hot.
-  float axisThresh = mix( 1e-8, 1e-3, uLineStrength );
+  float axisThresh = mix( 1e-8, 1e-3, rig );
   vec3 ref = abs( z.y ) < 0.95 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 );
   vec3 x = length( xr ) > axisThresh ? normalize( xr ) : normalize( cross( z, ref ) );
   vec3 y = cross( z , x );
@@ -50,15 +63,15 @@ void main(){
   // the motion direction, so a chain cruising straight in the screen plane
   // is seen edge-on — an invisible sliver. In line mode, point the length
   // axis along the motion and turn the plane toward the camera instead.
-  if ( uLineStrength > 0.001 ) {
+  if ( rig > 0.001 ) {
     vec3 zc = vec3( 0.0, 0.0, 1.0 ) - z * z.z;
     float zcl = length( zc );
     vec3 zcam = zcl > 1e-4 ? zc / zcl : vec3( 0.0, 1.0, 0.0 );
     vec3 xc = cross( z, zcam );
     rot = mat3(
-      mix( x, xc, uLineStrength ),
-      mix( y, z, uLineStrength ),
-      mix( z, zcam, uLineStrength )
+      mix( x, xc, rig ),
+      mix( y, z, rig ),
+      mix( z, zcam, rig )
     );
   }
 
@@ -107,8 +120,8 @@ void main(){
   // The line rig already points the length axis along the motion, so there
   // it elongates directly instead of shearing into the plane normal.
   float stretch = clamp(vSpeed * uStretch, 0.0, 1.2) * (1.0 - uSnowflake);
-  modifiedPos.z += modifiedPos.y * stretch * (1.0 - uLineStrength);
-  modifiedPos.y *= 1.0 + stretch * 1.2 * uLineStrength;
+  modifiedPos.z += modifiedPos.y * stretch * (1.0 - rig);
+  modifiedPos.y *= 1.0 + stretch * 1.2 * rig;
 
   // Near-camera boost: particles drifting toward the lens grow beyond raw
   // perspective, reading as big soft foreground shapes "outside" the screen

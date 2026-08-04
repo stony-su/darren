@@ -16,6 +16,8 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform float uSpeedGlow;
 uniform float uLineStrength;
+uniform float uAttractor;
+uniform float uHole;
 uniform float uFormationGlow; // 1 normally; dips while a formation is held so
 //                               dense shapes show palette color, not bloom-white
 
@@ -38,9 +40,21 @@ void main() {
   vec3 colB = gradientColor(uPaletteB[0], uPaletteB[1], uPaletteB[2], uPaletteB[3], uPaletteB[4], uFxB, uNormalB);
   vec3 col = mix(colA, colB, uBlend);
 
+  // The two modes that concentrate the field: the attractor onto its manifold,
+  // the black hole into its disc. Both pack the population into a fraction of
+  // the volume chaos spreads it over.
+  float dense = max(uAttractor, uHole);
+
   // Velocity glow: fast particles brighten (capped harder in line mode —
   // chains assembling at speed otherwise storm into a whiteout)
-  col *= 1.0 + clamp(vSpeed * uSpeedGlow, 0.0, mix(0.45, 0.18, uLineStrength));
+  col *= 1.0 + clamp(vSpeed * uSpeedGlow, 0.0, mix(0.45, 0.18, max(uLineStrength, dense)));
+
+  // A concentrated field flies along coherent paths, so per-pixel the
+  // particles stack up and the trail pass keeps re-adding them along the same
+  // line. Nothing downstream can recover from that — including the theme-0
+  // normal coloring, which skips the glow damping entirely — so take the
+  // brightness out at the source and let the density do the lighting.
+  col *= 1.0 - 0.45 * dense;
 
   // Depth fade: dissolve distant particles into the background
   col = mix(col, uFogColor, smoothstep(uFogNear, uFogFar, vViewZ));

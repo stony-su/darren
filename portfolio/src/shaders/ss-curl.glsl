@@ -25,12 +25,60 @@ uniform float shockStrength;
 
 uniform float uTime;
 uniform float lineStrength;
+uniform float attractorStrength; // 0 = curl chaos, 1 = Lorenz strange attractor
+uniform float holeStrength; // 0 = curl chaos, 1 = black hole owns the field
+uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
 uniform float speedSpread; // 0 = every particle runs at sim speed, 1 = full 0.1x..10x spread
 
 varying vec2 vUv;
 
 // Chain length for filament-line mode (particles per line)
 #define CHAIN 64.0
+
+// Lorenz strange attractor (classic sigma/rho/beta — the butterfly). LZ_SCALE
+// is world units per Lorenz unit; the attractor spans roughly +/-20 in x and
+// 0..50 in z, so 0.04 fills the stage height with margin. LZ_ZC re-centers
+// that z range on the world origin, and LZ_DEPTH squashes the attractor's
+// remaining axis into screen depth so the silhouette stays the recognizable
+// butterfly instead of an edge-on smear.
+#define LZ_SIGMA 10.0
+#define LZ_RHO   28.0
+#define LZ_BETA  2.6666667
+// Sized well under the frustum on purpose: particles lag the flow through
+// every turn, so the cloud settles onto a manifold noticeably fatter than the
+// ideal curve, and a scale that fits on paper overflows the frame in motion.
+#define LZ_SCALE 0.030
+#define LZ_ZC    25.0
+// Depth is mapped 1:1 with the other two axes rather than squashed: flattening
+// the attractor toward the screen plane is what turns it from a butterfly into
+// a filled violet blob. At full depth the wings tilt through ~1.3 world units
+// of z, so perspective and the depth fade separate the near wing from the far
+// one and the structure reads.
+#define LZ_DEPTH 1.0
+#define LZ_CRUISE 0.0095
+
+// Black hole. Speeds below are world units per frame at 60fps / 1x sim speed;
+// they get the frame step and the per-particle draw applied at the use site.
+// The stage is roughly 4.5 x 2.5 world units at z=0, so a rim at 1.45 fills
+// the frame's height and leaves the corners to the free field.
+#define BH_RIM     1.45
+// Where particles are actually eaten. Much smaller than the shadow you see —
+// see the note on the plunge term for which one draws the black centre.
+#define BH_HORIZON 0.085
+// Softening radius for the orbit law. Without it v ~ 1/sqrt(r) runs away as
+// r -> 0 and the last ring before the horizon steps further per frame than it
+// is wide, which draws as a scribble rather than a ring.
+#define BH_CORE    0.16
+#define BH_ORBIT   0.0135
+#define BH_INFALL  0.0026
+// Disc axis: mostly toward the camera, tilted ~23 degrees off it. Face-on the
+// disc is a flat ring with no depth to read; edge-on it is a line. This much
+// tilt shows it as an ellipse, and puts the far half far enough back that the
+// depth fade separates it from the near half. BH_U/BH_V span the disc plane
+// (BH_V = cross(BH_N, BH_U)) and are only used to place respawns on the rim.
+#define BH_N vec3(0.0, 0.3873, 0.9221)
+#define BH_U vec3(1.0, 0.0, 0.0)
+#define BH_V vec3(0.0, 0.9221, -0.3873)
 
 // -- simplex noise chunk --
 %SIMPLEX%
@@ -56,6 +104,12 @@ void main(){
   vec4 pos  = texture2D( t_pos , uv );
 
   vec3 vel = pos.xyz - oPos.xyz;
+  // Velocity is implicit in the two position buffers, so a position that did
+  // not come from the one before it — the black hole's horizon respawn is the
+  // only one — reads here as a single stage-crossing step. The sim flags such
+  // a write by putting 0 in the w channel (1 otherwise); that particle simply
+  // restarts from rest, and the field it lands in accelerates it again.
+  vel *= step(0.5, pos.w);
 
   // Frame-rate normalisation. Drag and the formation hold stay on this clock;
   // the driving forces run on `timeScale` below, which the randomized-speed
@@ -128,7 +182,12 @@ void main(){
   vec3 toCenter = pos.xyz;
   float dist = length(toCenter);
   if (dist > 0.001) {
-    float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive);
+    // The attractor owns the middle of the stage (the saddle between its two
+    // lobes sits on the origin), so its flow is exempt from the exclusion too.
+    // So is the black hole: the well is usually parked near the middle, and an
+    // origin repulsion punches a hole straight through the inner disc.
+    float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive)
+                  * (1.0 - max(attractorStrength, holeStrength));
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
@@ -149,6 +208,118 @@ void main(){
     vel += mouseDir * mouseForce * influence * 0.0045 * timeScale;
   }
 
+  // Strange-attractor mode: swap the curl field for the flow of the Lorenz
+  // system. Every particle steers toward the local field direction, so the
+  // whole population converges onto the attractor's manifold and then orbits
+  // it forever — winding out one lobe of the butterfly, flipping to the other,
+  // never repeating. Steering (a first-order chase toward a target velocity)
+  // rather than integrating the raw derivative: the field's magnitude spans two
+  // orders of magnitude, and adding that as acceleration flings the outliers
+  // off-screen.
+  // Placed above the card deflection and below the mouse force on purpose —
+  // both of those then push against the settled flow, so the pointer and the
+  // slide's copy still carve visible holes in the butterfly instead of being
+  // overwritten by it every frame. In filament-line mode only the leaders
+  // steer; their chains draw the flow lines behind them.
+  if (attractorStrength > 0.001) {
+    float lx = pos.x / LZ_SCALE;
+    float ly = pos.z / (LZ_SCALE * LZ_DEPTH);
+    float lz = pos.y / LZ_SCALE + LZ_ZC;
+    vec3 d = vec3(
+      LZ_SIGMA * (ly - lx),
+      lx * (LZ_RHO - lz) - ly,
+      lx * ly - LZ_BETA * lz
+    );
+    // Back to world axes: Lorenz z is screen-up, its y is screen depth.
+    vec3 flow = vec3(d.x, d.z, d.y * LZ_DEPTH) * LZ_SCALE;
+    float fl = length(flow);
+    vec3 dir = fl > 1e-6 ? flow / fl : vec3(0.0, 1.0, 0.0);
+    // Speed tracks the local field magnitude (clamped): particles crawl through
+    // the slow saddle in the middle and swoop through the lobe hand-offs, which
+    // is what makes the trails read as a flow rather than a moving crowd.
+    // dampScale keeps it frame-rate independent (and speed-slider responsive),
+    // capped so a 10x sim can't step further than the manifold is thick.
+    float cruise = LZ_CRUISE * clamp(fl / 3.0, 0.35, 2.2) * speedMul * min(dampScale, 4.0);
+    vec3 steered = mix(vel, dir * cruise, clamp(0.30 * timeScale, 0.0, 1.0));
+    vel = mix(vel, steered, attractorStrength * (1.0 - follower));
+  }
+
+  // Black-hole mode: the pointer becomes a gravity well, and the field is
+  // captured into an accretion disc. A tangential term winds particles into
+  // orbit, a slow radial term spirals them down, and the event horizon eats
+  // whatever reaches it and drops it back on the rim.
+  // Steered toward a target velocity rather than integrated from a 1/r^2
+  // acceleration, for the same reason the attractor is: real gravity spans
+  // orders of magnitude across the stage, and the inner particles leave the
+  // frame on the first frame. Steering also makes the orbit law something the
+  // shader states outright — v ~ 1/sqrt(r), so inner rings visibly shear past
+  // outer ones, which is the whole reason the disc reads as a disc and not a
+  // ring of confetti.
+  float bhEaten = 0.0;
+  vec3 bhRespawn = vec3(0.0);
+  if (holeStrength > 0.001) {
+    vec3 rel = pos.xyz - holeCenter;
+    float r = length(rel);
+    vec3 outward = r > 1e-5 ? rel / r : BH_U;
+
+    // Orbit direction: tangent to the circle this particle traces when rotated
+    // about the disc axis. Degenerate only for a particle sitting exactly on
+    // the axis, which the fallback shoves off it.
+    vec3 tang = cross(BH_N, outward);
+    float tlen = length(tang);
+    tang = tlen > 1e-4 ? tang / tlen : BH_U;
+
+    // A minority of particles are given a far looser disc and become the halo
+    // around it. Without them the entire population stacks onto one thin
+    // annulus, which is the density trap the rest of this file keeps warning
+    // about — and a bare disc reads flatter than a disc with a haze around it.
+    float bhRand = rand(uv * 1.93 + vec2(5.7, 2.1));
+    float halo = smoothstep(0.70, 1.0, bhRand);
+
+    float vOrb = BH_ORBIT / sqrt(max(r, BH_CORE));
+    // Slow drift inward, plunging below r ~ 0.85, plus a hauling term well
+    // outside the rim — at the ambient infall rate, switching the mode on
+    // spends fifteen seconds reeling in the corners of the stage before
+    // anything recognisable appears.
+    // The plunge is what draws the black disc at the centre, not BH_HORIZON:
+    // particles cross it several times faster than they drift through the
+    // disc, so the region inside it stays swept clean and reads as the hole's
+    // shadow. Tightening the plunge fills that in and costs the disc its
+    // depth — it narrows to a single uniform ring.
+    float vIn = BH_INFALL * (0.55
+                             + 1.35 * smoothstep(0.85, 0.12, r)
+                             + 2.00 * smoothstep(1.5, 3.2, r));
+
+    // Flatten toward the disc plane, but only past a flared half-thickness:
+    // driving every particle onto the plane exactly is the whiteout again.
+    float h = dot(rel, BH_N);
+    float halfH = (0.045 + 0.085 * r) * (1.0 + 5.0 * halo);
+    float over = h - clamp(h, -halfH, halfH);
+
+    // Absolute target speeds, so the frame step and the per-particle draw have
+    // to scale them directly (capped, exactly as the attractor's cruise is).
+    float bhStep = speedMul * min(dampScale, 4.0);
+    vec3 vTarget = (tang * vOrb - outward * vIn - BH_N * over * 0.12) * bhStep;
+    vec3 steered = mix(vel, vTarget, clamp(0.22 * timeScale, 0.0, 1.0));
+    vel = mix(vel, steered, holeStrength * (1.0 - follower));
+
+    // Event horizon. Nothing in this sim can write a velocity, so a respawn
+    // has to be a bare position write — see the w-channel flag at the top of
+    // main(), which is what keeps the teleport from reading as one colossal
+    // step here and as a screen-long streak in the vertex rig.
+    // Formation members are exempt: a preset holding a shape over the well
+    // would otherwise be shredded a particle at a time.
+    if (holeStrength > 0.5 && r < BH_HORIZON && arrive < 0.5) {
+      float ang = rand(uv * 7.31 + vec2(fract(uTime * 0.31), 1.7)) * 6.28318530718;
+      float rr = BH_RIM * (0.88 + 0.24 * rand(uv * 3.77 + vec2(2.3, fract(uTime * 0.17))));
+      // Halo particles come back into the halo, or the disc slowly eats it.
+      float lift = (rand(uv * 5.13 + vec2(fract(uTime * 0.23), 8.1)) - 0.5)
+                   * (0.10 + 1.6 * halo);
+      bhRespawn = holeCenter + (cos(ang) * BH_U + sin(ang) * BH_V) * rr + BH_N * lift;
+      bhEaten = 1.0;
+    }
+  }
+
   // Rounded-box deflection around the visible project card. The z-mask is
   // asymmetric: wide on the camera side (anything glowing between the card
   // and the lens washes out its text through the backdrop blur), narrow on
@@ -159,7 +330,13 @@ void main(){
     float sd = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - cardRadius;
     float dz = pos.z - cardCenter.z;
     float zMask = dz > 0.0 ? smoothstep(1.7, 0.2, dz) : smoothstep(0.9, 0.15, -dz);
-    float deflect = smoothstep(0.18, -0.05, sd) * cardStrength * zMask;
+    // Softened under the attractor: at full strength the deflection fountains a
+    // steady plume of particles off the top of the frame, since the flow keeps
+    // feeding the card's neighbourhood. This much still carves a readable hole
+    // around the copy without the leak. The black hole feeds the card the same
+    // way — every orbit sweeps the population back past it.
+    float deflect = smoothstep(0.18, -0.05, sd) * cardStrength * zMask
+                    * (1.0 - 0.6 * max(attractorStrength, holeStrength));
     vel += normalize(vec3(rel, 0.0) + vec3(0.0, 0.0, 1e-5)) * deflect * 0.0009 * timeScale;
   }
 
@@ -177,7 +354,9 @@ void main(){
       // pin every filament to the same speed no matter its draw.
       float cruise = 0.0032 * (0.7 + 0.6 * chainRand) * speedMul;
       vec3 steered = mix(vel, flowDir * cruise, clamp(0.10 * timeScale, 0.0, 1.0));
-      vel = mix(vel, steered, lineStrength);
+      // Attractor mode takes the leaders over (below), so the chains trace the
+      // butterfly instead of a curl field; the followers keep chasing either way.
+      vel = mix(vel, steered, lineStrength * (1.0 - attractorStrength));
     } else {
       float prevIdx = idx - 1.0;
       vec2 prevUv = (vec2(mod(prevIdx, texW), floor(prevIdx / texW)) + 0.5) / resolution;
@@ -256,5 +435,14 @@ void main(){
 
   vec3 p = pos.xyz + vel;
 
-  gl_FragColor = vec4( p , 1. );
+  // w = 1 for a position integrated from the previous one, 0 for a position
+  // written from nowhere (a black-hole respawn). Consumers of the two position
+  // buffers difference them to get velocity, so they need to be told.
+  float continuous = 1.0;
+  if (bhEaten > 0.5) {
+    p = bhRespawn;
+    continuous = 0.0;
+  }
+
+  gl_FragColor = vec4( p , continuous );
 }

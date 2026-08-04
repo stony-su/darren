@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { Curl } from './Curl';
 import { createFeatherGeometry } from './Feather';
 import { PostPipeline } from './PostPipeline';
-import { STAGE_W, STAGE_H, knotDrawer } from './IntroChoreography';
+import { STAGE_W, STAGE_H } from './IntroChoreography';
 import type { TargetDrawer } from './IntroChoreography';
 import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
 import { loadSettings } from './settings';
 import type { MouseMode, LineMode } from './settings';
+import { DEFAULT_MODE } from './modes';
+import { findPreset } from './presets';
+import type { PresetRunner } from './presets';
 import { THEMES, bgToRgb } from '../theme/themes';
 import { applyThemeCssVars } from '../theme/themes';
 import type { Vec3Tuple } from '../theme/themes';
@@ -76,6 +79,19 @@ export class ParticleScene {
   private autoLine = false;
   private panelLineMode: LineMode = 'auto';
   private simTime = 0;
+
+  // Modes (persistent physics changes) + presets (scripted scenarios)
+  private modeId = DEFAULT_MODE;
+  private attractorTarget = 0;
+  private holeTarget = 0;
+  // Latest pointer position on the z=0 plane. Tracked separately from
+  // `mousePos` (which only exists while a mouse force is armed) because the
+  // black hole follows the pointer whether or not one is.
+  private pointerWorld = new THREE.Vector3();
+  private presetId: string | null = null;
+  private presetRunner: PresetRunner | null = null;
+  private presetSpeed: number | null = null;
+  private presetBloom: number | null = null;
 
   // Animated formation targets (intro slides). A per-slide drawer paints
   // white shapes on an offscreen canvas; lit pixels become spring targets.
@@ -165,6 +181,9 @@ export class ParticleScene {
       shockStrength: { value: 0.0 },
       uTime: { value: 0.0 },
       lineStrength: { value: 0.0 },
+      attractorStrength: { value: 0.0 },
+      holeStrength: { value: 0.0 },
+      holeCenter: { value: new THREE.Vector3(0, 0, 0) },
       speedSpread: { value: 0.0 },
     };
 
@@ -184,8 +203,10 @@ export class ParticleScene {
       uFogColor: { value: new THREE.Vector3(...this.bgSrgbA) },
       uFogNear: { value: 2.3 },
       uFogFar: { value: 3.0 },
-      // Shared object with the sim uniform — one value drives both shaders
+      // Shared objects with the sim uniforms — one value drives both shaders
       uLineStrength: this.soulUniforms.lineStrength,
+      uAttractor: this.soulUniforms.attractorStrength,
+      uHole: this.soulUniforms.holeStrength,
     };
 
     this.tier = pickTier();
@@ -249,12 +270,18 @@ export class ParticleScene {
   }
 
   private onMouseMove = (e: MouseEvent): void => {
-    if ((this.soulUniforms.mouseForce.value as number) === 0) return;
+    const force = this.soulUniforms.mouseForce.value as number;
+    // Skipped entirely when nothing wants the pointer — but black-hole mode
+    // always does, since the well *is* the pointer.
+    if (force === 0 && this.holeTarget === 0) return;
     this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
     this.raycaster.ray.intersectPlane(this.attractPlane, this.intersectPoint);
-    (this.soulUniforms.mousePos.value as THREE.Vector3).copy(this.intersectPoint);
+    this.pointerWorld.copy(this.intersectPoint);
+    if (force !== 0) {
+      (this.soulUniforms.mousePos.value as THREE.Vector3).copy(this.intersectPoint);
+    }
   };
 
   private onResize = (): void => {
@@ -381,8 +408,11 @@ export class ParticleScene {
     this.soulUniforms.formationParticipation.value = Math.max(0.04, Math.min(1, fraction));
   }
 
-  /** Ramp particle formation on/off. */
-  setTextFormation(active: boolean): void {
+  /** Ramp particle formation on/off. `releaseShock` scales the blast that
+   *  fires when a held formation lets go — the intro wants the full kick, a
+   *  preset running the sim hot needs less of one (the shock force scales with
+   *  the sim speed, so at 1.5x the default throws the field clean off-frame). */
+  setTextFormation(active: boolean, releaseShock = 1): void {
     // Releasing a held formation fires a scatter burst so the shapes
     // dissolve into the flow instead of lingering as a dense cluster, plus a
     // shockwave centered on the shape so it visibly blows apart first.
@@ -390,7 +420,7 @@ export class ParticleScene {
       this.burst = 1;
       const { offX, offY } = this.formationStage();
       (this.soulUniforms.shockCenter.value as THREE.Vector3).set(offX, offY, 0);
-      this.shock = 1;
+      this.shock = releaseShock;
       // Flush bright trails so the dissolve doesn't smear into a whiteout
       this.post.kickDamp(0.45, 1200);
     }
@@ -544,8 +574,19 @@ export class ParticleScene {
   }
 
   private applyLine(): void {
+    // Attractor and black-hole mode both outrank swirl lines. A 64-particle
+    // chain is about as long as the whole attractor, so the followers wrap
+    // right across it and smear the butterfly into an oval smudge; under the
+    // black hole a leader that falls through the horizon respawns on the rim
+    // and hauls its entire chain across the stage behind it. Project slides
+    // turn lines on by themselves, so this combination is the default path
+    // into a mode, not an exotic one — lines come back the moment it goes off.
     const on =
-      this.panelLineMode === 'auto' ? this.autoLine : this.panelLineMode === 'on';
+      this.attractorTarget > 0 || this.holeTarget > 0
+        ? false
+        : this.panelLineMode === 'auto'
+          ? this.autoLine
+          : this.panelLineMode === 'on';
     if (on && this.lineTarget === 0) {
       // Chains assembling at speed leave bright smears; keep trails flushed
       // until the lines have mostly formed.
@@ -570,21 +611,71 @@ export class ParticleScene {
     this.soulUniforms.noiseSize.value = n;
   }
 
-  /** Playground preset: pull the field into a trefoil-knot formation, or
-   *  release it. Uses the same drawer/spring machinery as the intro slides,
-   *  so releasing fires the usual scatter + shockwave. Participation is kept
-   *  low — packing the whole field onto thin strands overflows them and the
-   *  knot fills in as a solid blob. */
-  setGatherPreset(enabled: boolean): void {
-    if (enabled) {
-      this.setFormationOffset(0, 0);
-      this.setFormationParticipation(0.16);
-      this.setTargetDrawer(knotDrawer());
-      this.setTextFormation(true);
-    } else {
-      this.setTextFormation(false);
-      this.drawer = null;
-    }
+  /* ── Modes + presets ── */
+
+  /** Switch the field's physics (see modes.ts). Unknown ids fall back to the
+   *  default, so a stale saved setting can never wedge the scene. */
+  setMode(id: string): void {
+    this.modeId = id;
+    const attractor = id === 'attractor' ? 1 : 0;
+    const hole = id === 'blackhole' ? 1 : 0;
+    // The field re-forms onto the new manifold over a second or so — several,
+    // for the black hole, which has to reel the corners of the stage in before
+    // the disc exists. Keep the trails flushed until it has, or the migration
+    // smears into a whiteout.
+    if (attractor && this.attractorTarget === 0) this.post.kickDamp(0.5, 2200);
+    if (hole && this.holeTarget === 0) this.post.kickDamp(0.5, 4000);
+    this.attractorTarget = attractor;
+    this.holeTarget = hole;
+    this.applyLine();
+  }
+
+  get currentMode(): string {
+    return this.modeId;
+  }
+
+  /** Run a scripted preset (see presets.ts), or null to stop the current one.
+   *  Stopping restores the user's sim speed and bloom. */
+  setPreset(id: string | null): void {
+    if (id === this.presetId) return;
+    // Hand the sim speed back *before* stopping: a preset's stop releases its
+    // formation, and that blast scales with whatever speed is in force when it
+    // lands. Stopping the knot (which runs at 10x) with its own speed still
+    // applied throws the whole field off-screen.
+    const running = this.presetRunner;
+    this.presetRunner = null;
+    this.presetId = null;
+    this.presetSpeed = null;
+    this.presetBloom = null;
+    running?.stop(this);
+
+    const def = findPreset(id);
+    if (!def) return;
+    this.presetId = def.id;
+    this.presetSpeed = def.simSpeed ?? null;
+    this.presetRunner = def.start(this);
+  }
+
+  get currentPreset(): string | null {
+    return this.presetId;
+  }
+
+  /** Preset hook: bloom strength that outranks both the theme and the
+   *  per-slide override, so navigating slides mid-preset can't clobber it. */
+  setPresetBloom(strength: number | null): void {
+    this.presetBloom = strength;
+  }
+
+  /** Preset hook: fire a shockwave centred on the formation stage. */
+  shockwave(strength: number): void {
+    const { offX, offY } = this.formationStage();
+    (this.soulUniforms.shockCenter.value as THREE.Vector3).set(offX, offY, 0);
+    this.shock = Math.max(this.shock, strength);
+  }
+
+  /** Preset hook: briefly flush motion trails. */
+  kickTrails(damp: number, durationMs: number): void {
+    this.post.kickDamp(damp, durationMs);
   }
 
   /** Give each particle its own speed, drawn on a bell curve spanning
@@ -675,16 +766,39 @@ export class ParticleScene {
       this.animationId = requestAnimationFrame(animate);
 
       const dT = this.clock.getDelta();
-      this.soulUniforms.dT.value = dT * this.speedMultiplier;
+      // A running preset owns the sim speed; the user's slider value is kept
+      // untouched underneath and takes over again the moment it stops.
+      const speed = this.presetSpeed ?? this.speedMultiplier;
+      this.soulUniforms.dT.value = dT * speed;
       // Sim clock scales with the speed multiplier so floater oscillation
       // paces with the rest of the field
-      this.simTime += dT * this.speedMultiplier;
+      this.simTime += dT * speed;
       this.soulUniforms.uTime.value = this.simTime;
+
+      // Preset choreography runs on the wall clock, not the sim clock, so its
+      // beats land at the same moments whatever the sim speed is.
+      this.presetRunner?.update?.(this, dT);
 
       // Filament-line mode ramps in/out over ~1s
       const ls = this.soulUniforms.lineStrength.value as number;
       this.soulUniforms.lineStrength.value =
         ls + (this.lineTarget - ls) * Math.min(1, dT * 1.1);
+
+      // Mode ramps: attractor / black hole take over the field over ~1s
+      const as = this.soulUniforms.attractorStrength.value as number;
+      this.soulUniforms.attractorStrength.value =
+        as + (this.attractorTarget - as) * Math.min(1, dT * 1.1);
+      const hs = this.soulUniforms.holeStrength.value as number;
+      this.soulUniforms.holeStrength.value =
+        hs + (this.holeTarget - hs) * Math.min(1, dT * 1.1);
+      // The well lags the pointer by ~0.4s. A black hole that tracks the cursor
+      // exactly reads as weightless, and a flick across the stage snaps the
+      // whole disc sideways and tears it apart; trailing it drags the disc
+      // along instead, which is most of what sells the mass.
+      (this.soulUniforms.holeCenter.value as THREE.Vector3).lerp(
+        this.pointerWorld,
+        Math.min(1, dT * 2.2)
+      );
 
       this.frameMonitor?.tick(dT);
 
@@ -718,9 +832,22 @@ export class ParticleScene {
       if (this.post.active) {
         const target = theme.bloom;
         const cur = this.post.getBloomStrength();
-        const goal = (this.bloomOverride ?? target.strength) * this.bloomMult;
+        // The concentrating modes are the densest steady states the field has;
+        // they need less bloom and shorter trails than any theme asks for, or
+        // the attractor's lobes and the black hole's inner disc fill in solid.
+        // Ramped with the mode so the switch stays smooth, and still yields to
+        // an explicit trail setting from the playground.
+        const dense = Math.max(
+          this.soulUniforms.attractorStrength.value as number,
+          this.soulUniforms.holeStrength.value as number
+        );
+        const goal =
+          (this.presetBloom ?? this.bloomOverride ?? target.strength) *
+          this.bloomMult *
+          (1 - 0.45 * dense);
         this.post.setBloom(cur + (goal - cur) * Math.min(1, dT * 3), target.radius, target.threshold);
-        this.post.setDamp(this.trailOverride ?? theme.afterimageDamp);
+        const damp = theme.afterimageDamp + (0.52 - theme.afterimageDamp) * dense;
+        this.post.setDamp(this.trailOverride ?? damp);
       }
 
       // Animated formation: re-rasterize the active drawer a few times a
@@ -744,8 +871,17 @@ export class ParticleScene {
 
       // Held formations dim their palette glow so dense shapes read as color
       // instead of blooming to white (the DARREN theme has glow 0 already).
+      // The concentrating modes get the same treatment: packing the field onto
+      // a thin manifold or into an accretion disc is, on a glowing theme, the
+      // same whiteout by another road.
       this.bodyUniforms.uFormationGlow.value =
-        1 - 0.85 * (this.soulUniforms.targetStrength.value as number);
+        (1 - 0.85 * (this.soulUniforms.targetStrength.value as number)) *
+        (1 -
+          0.55 *
+            Math.max(
+              this.soulUniforms.attractorStrength.value as number,
+              this.soulUniforms.holeStrength.value as number
+            ));
 
       // Release-burst decay (~1s)
       if (this.burst > 0.001) {

@@ -3,6 +3,7 @@ import { ParticleScene } from './animation/scene';
 import { IntroSequence, INTRO_RAIL_LABELS } from './components/IntroSequence';
 import { ProjectSlideshow, SLUGS } from './components/ProjectSlideshow';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
+import { ModesPanel } from './components/ModesPanel';
 import { ProgressRail } from './components/ProgressRail';
 import { PROJECTS } from './data/projects';
 
@@ -41,6 +42,7 @@ async function main() {
   let intro: IntroSequence | null = null;
   let slideshow: ProjectSlideshow | null = null;
   let playground: PlaygroundPanel | null = null;
+  let modes: ModesPanel | null = null;
   let pendingSlide = 0;
 
   const rail = new ProgressRail(railLabels, INTRO_OFFSET, (i) => {
@@ -72,6 +74,8 @@ async function main() {
     slideshow.show({ initialIndex });
     playground = new PlaygroundPanel(particleScene);
     playground.mount(app);
+    modes = new ModesPanel(particleScene);
+    modes.mount(app);
   };
 
   const teardownSlideshow = (): void => {
@@ -79,6 +83,8 @@ async function main() {
     slideshow = null;
     playground?.destroy();
     playground = null;
+    modes?.destroy();
+    modes = null;
     history.replaceState(null, '', location.pathname + location.search);
   };
 
