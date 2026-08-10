@@ -408,18 +408,20 @@ export class ParticleScene {
   }
 
   /** Ramp particle formation on/off. `releaseShock` scales the blast that
-   *  fires when a held formation lets go — the intro wants the full kick, a
-   *  preset running the sim hot needs less of one (the shock force scales with
-   *  the sim speed, so at 1.5x the default throws the field clean off-frame). */
+   *  fires when a held formation lets go — a preset running the sim hot needs
+   *  less than the default (the shock force scales with the sim speed, so at
+   *  1.5x a full-strength blast throws the field clean off-frame). */
   setTextFormation(active: boolean, releaseShock = 1): void {
     // Releasing a held formation fires a scatter burst so the shapes
     // dissolve into the flow instead of lingering as a dense cluster, plus a
-    // shockwave centered on the shape so it visibly blows apart first.
+    // shockwave centered on the shape so it visibly comes apart first. The
+    // blast is kept gentle — it should nudge the shape into a loose drift,
+    // not detonate it across the stage.
     if (!active && this.targetStrengthGoal > 0 && this.hasTargets) {
       this.burst = 1;
       const { offX, offY } = this.formationStage();
       (this.soulUniforms.shockCenter.value as THREE.Vector3).set(offX, offY, 0);
-      this.shock = releaseShock;
+      this.shock = releaseShock * 0.45;
       // Flush bright trails so the dissolve doesn't smear into a whiteout
       this.post.kickDamp(0.45, 1200);
     }
@@ -854,12 +856,14 @@ export class ParticleScene {
         }
       }
 
-      // Formation strength ramp (in ~0.5s, out ~0.35s)
+      // Formation strength ramp (in ~1.2s, out ~0.35s). The slow ramp-in is
+      // what makes a shape condense gradually out of the drifting cloud
+      // instead of snapping together.
       const ts = this.soulUniforms.targetStrength.value as number;
       const goalActive = this.targetStrengthGoal > 0 && this.hasTargets;
       const tsGoal = goalActive ? this.targetStrengthGoal : 0;
       this.soulUniforms.targetStrength.value =
-        ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 2.2 : 3.0));
+        ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 0.9 : 3.0));
 
       // Held formations dim their palette glow so dense shapes read as color
       // instead of blooming to white (the DARREN theme has glow 0 already).
@@ -883,11 +887,11 @@ export class ParticleScene {
       }
       this.soulUniforms.burstStrength.value = this.burst;
 
-      // Shockwave decay (~0.4s). Deliberately much shorter than the burst:
+      // Shockwave decay (~0.3s). Deliberately much shorter than the burst:
       // the scatter has to be spent by the time the next formation gathers,
       // or the shapes fight the spring pulling them back in.
       if (this.shock > 0.001) {
-        this.shock *= Math.pow(0.0004, dT);
+        this.shock *= Math.pow(0.00002, dT);
       } else {
         this.shock = 0;
       }

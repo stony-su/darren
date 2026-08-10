@@ -195,8 +195,10 @@ export const INTRO_RAIL_LABELS: string[] = INTRO_LINES.map((l) => l.railLabel);
 /* ── Timing / layout ── */
 
 const FANOUT_DURATION = 2000;
-/** Free-flow beat between one formation dissolving and the next assembling. */
-const TRANSITION_GAP = 450;
+/** Free-flow beat between one formation dissolving and the next assembling.
+ *  Long enough that the released particles visibly drift free for a moment
+ *  instead of being snatched straight into the next shape. */
+const TRANSITION_GAP = 1100;
 /** Persistent image frames (max stickers on any single slide). */
 const POOL_SIZE = 4;
 

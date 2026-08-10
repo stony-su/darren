@@ -358,9 +358,10 @@ void main(){
 
   // Text-formation target attraction: spring toward per-particle target,
   // staggered by the target texel's random w, with settle damping so the
-  // letters hold still once formed.
+  // letters hold still once formed. The spring is kept soft so particles
+  // glide onto their targets over a couple of seconds rather than snapping.
   if (arrive > 0.001) {
-    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * timeScale;
+    vel += (tgt.xyz - pos.xyz) * 0.04 * arrive * timeScale;
     vel *= mix(1.0, pow(0.80, timeScale), arrive * 0.9);
   }
 
