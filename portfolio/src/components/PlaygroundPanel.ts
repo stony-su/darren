@@ -119,11 +119,6 @@ export class PlaygroundPanel {
           <input type="range" id="pg-speed" min="0.1" max="10" step="0.05" value="${s.speed}" />
         </div>
 
-        <div class="pg-row pg-row-inline">
-          <span class="font-body" title="Give every particle its own speed, on a bell curve from 0.1x to 10x. Swirl-line filaments each move as one object.">Random speed</span>
-          <button type="button" id="pg-random-speed" class="pg-btn font-body">${s.randomSpeed ? 'On' : 'Off'}</button>
-        </div>
-
         <div class="pg-row">
           <label for="pg-noise" class="font-body">Noise scale <span class="pg-value" id="pg-noise-value">${s.noiseSize.toFixed(1)}</span></label>
           <input type="range" id="pg-noise" min="0.3" max="4" step="0.1" value="${s.noiseSize}" />
@@ -191,14 +186,6 @@ export class PlaygroundPanel {
       this.settings.speed = parseFloat(speed.value);
       this.q('pg-speed-value').textContent = this.settings.speed.toFixed(2) + 'x';
       this.scene.setSpeedMultiplier(this.settings.speed);
-      this.persist();
-    });
-
-    const randomSpeed = this.q<HTMLButtonElement>('pg-random-speed');
-    randomSpeed.addEventListener('click', () => {
-      this.settings.randomSpeed = !this.settings.randomSpeed;
-      randomSpeed.textContent = this.settings.randomSpeed ? 'On' : 'Off';
-      this.scene.setRandomSpeed(this.settings.randomSpeed);
       this.persist();
     });
 
@@ -276,7 +263,6 @@ export class PlaygroundPanel {
   private applyAll(): void {
     const s = this.settings;
     if (s.speed !== DEFAULT_SETTINGS.speed) this.scene.setSpeedMultiplier(s.speed);
-    if (s.randomSpeed !== DEFAULT_SETTINGS.randomSpeed) this.scene.setRandomSpeed(s.randomSpeed);
     if (s.noiseSize !== DEFAULT_SETTINGS.noiseSize) this.scene.setNoiseSize(s.noiseSize);
     if (s.mouseMode !== DEFAULT_SETTINGS.mouseMode) this.scene.setMouseMode(s.mouseMode);
     if (s.mouseStrength !== DEFAULT_SETTINGS.mouseStrength) this.scene.setMouseStrength(s.mouseStrength);

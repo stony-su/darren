@@ -1,5 +1,0 @@
- slide 2 "i code websites", slide 3 "and when i'm not, you can find me reading", slide 4 "or playing hockey". The idle animation make them blurry and unreadable. Remove the idle animation, instead only making
-  them form an still object like slide 1: "Hi, I'm Darren". Then change the shape of particle formed object on slide 3 into a different object better suited as a still object (but not too intricate that it
-  cannot be formed by particles). last, present me with an 3 alternate plan to form animations with the particles to create a moving image while still being clear and how to achieve that. I will read these
-  over and choose one for you to elborate on (do not plan out too many technical details yet, just the bare bones). (one of them should be creating a still object for 1 second, then moving another "frame", at
-  1 second per frame, so each frame is distinct and not blurry)

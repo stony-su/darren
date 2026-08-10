@@ -3,7 +3,6 @@ export type LineMode = 'auto' | 'on' | 'off';
 
 export interface PlaygroundSettings {
   speed: number;                // sim speed multiplier
-  randomSpeed: boolean;         // per-particle speed on a 0.1x..10x bell curve
   noiseSize: number;            // curl noise scale
   mouseMode: MouseMode;         // 'auto' = slideshow decides
   mouseStrength: number;        // attract/repel force multiplier
@@ -17,7 +16,6 @@ export interface PlaygroundSettings {
 
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
   speed: 1,
-  randomSpeed: false,
   noiseSize: 1.5,
   mouseMode: 'auto',
   mouseStrength: 1,
@@ -37,8 +35,10 @@ export function loadSettings(): PlaygroundSettings {
     if (!raw) return { ...DEFAULT_SETTINGS };
     // `gather` was the standalone knot toggle before presets existed; carry a
     // saved one over as the equivalent preset rather than dropping it.
-    const { gather, ...parsed } = JSON.parse(raw) as Partial<PlaygroundSettings> & {
+    // `randomSpeed` is a removed feature; strip a saved one.
+    const { gather, randomSpeed, ...parsed } = JSON.parse(raw) as Partial<PlaygroundSettings> & {
       gather?: unknown;
+      randomSpeed?: unknown;
     };
     const settings = { ...DEFAULT_SETTINGS, ...parsed };
     if (gather === true && settings.preset === null) settings.preset = 'knot';

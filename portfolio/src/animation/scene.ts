@@ -184,7 +184,6 @@ export class ParticleScene {
       attractorStrength: { value: 0.0 },
       holeStrength: { value: 0.0 },
       holeCenter: { value: new THREE.Vector3(0, 0, 0) },
-      speedSpread: { value: 0.0 },
     };
 
     const theme0 = THEMES[0];
@@ -676,13 +675,6 @@ export class ParticleScene {
   /** Preset hook: briefly flush motion trails. */
   kickTrails(damp: number, durationMs: number): void {
     this.post.kickDamp(damp, durationMs);
-  }
-
-  /** Give each particle its own speed, drawn on a bell curve spanning
-   *  0.1x..10x of the sim speed (off = everything runs at one speed). With
-   *  swirl lines on, the draw is per chain so a filament stays one object. */
-  setRandomSpeed(enabled: boolean): void {
-    this.soulUniforms.speedSpread.value = enabled ? 1 : 0;
   }
 
   setTrailOverride(damp: number | null): void {

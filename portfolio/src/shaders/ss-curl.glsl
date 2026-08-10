@@ -28,7 +28,6 @@ uniform float lineStrength;
 uniform float attractorStrength; // 0 = curl chaos, 1 = Lorenz strange attractor
 uniform float holeStrength; // 0 = curl chaos, 1 = black hole owns the field
 uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
-uniform float speedSpread; // 0 = every particle runs at sim speed, 1 = full 0.1x..10x spread
 
 varying vec2 vUv;
 
@@ -90,13 +89,6 @@ float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
-// Box-Muller: two uniform samples -> one standard normal. Used for the
-// randomized-speed bell curve; a plain rand() would spread speeds flat.
-float gauss(vec2 s1, vec2 s2){
-    float u1 = max(rand(s1), 1e-6);
-    return sqrt(-2.0 * log(u1)) * cos(6.28318530718 * rand(s2));
-}
-
 void main(){
 
   vec2 uv = gl_FragCoord.xy / resolution;
@@ -111,10 +103,8 @@ void main(){
   // restarts from rest, and the field it lands in accelerates it again.
   vel *= step(0.5, pos.w);
 
-  // Frame-rate normalisation. Drag and the formation hold stay on this clock;
-  // the driving forces run on `timeScale` below, which the randomized-speed
-  // option scales per particle.
-  float dampScale = dT * 60.0;
+  // Time-based speed multiplier
+  float timeScale = dT * 60.0;
 
   // Filament-chain topology: consecutive texels form follow-the-leader
   // chains of CHAIN particles. Index 0 of each chain is the leader.
@@ -126,28 +116,6 @@ void main(){
   float chainId = floor(idx / CHAIN);
   float chainRand = rand(vec2(chainId * 0.137, 4.7));
   float follower = lineStrength * (1.0 - isLeader);
-
-  // Randomized speed: each particle gets its own multiplier, normal in log10
-  // space centred on 1x, so the spread is a bell over 0.1x..10x — most sit near
-  // normal speed and the extremes are rare.
-  // It scales the driving forces only, NOT the drag below: drag already scales
-  // with the timestep, so multiplying both just cancels out and every particle
-  // ends up at the same terminal speed.
-  // In line mode the draw is seeded per chain, so a whole filament shares one
-  // speed and travels as a single object.
-  float speedMul = 1.0;
-  if (speedSpread > 0.0001) {
-    vec2 cs = vec2(chainId * 0.311, chainId * 0.577);
-    float g = mix(
-      gauss(uv * 3.17 + 11.3, uv * 5.41 + 27.9),
-      gauss(cs + 9.13, cs + 2.71),
-      lineStrength
-    );
-    // +/-3 sigma spans one decade each way; the clamp pins the tails to the
-    // stated 0.1x / 10x bounds instead of letting a rare sample run away.
-    speedMul = pow(10.0, clamp(g / 3.0, -1.0, 1.0) * speedSpread);
-  }
-  float timeScale = dampScale * speedMul;
 
   vec3 curl = curlNoise( pos.xyz * noiseSize );
   // Followers in line mode shed most of their individual jitter so the
@@ -237,9 +205,9 @@ void main(){
     // Speed tracks the local field magnitude (clamped): particles crawl through
     // the slow saddle in the middle and swoop through the lobe hand-offs, which
     // is what makes the trails read as a flow rather than a moving crowd.
-    // dampScale keeps it frame-rate independent (and speed-slider responsive),
+    // timeScale keeps it frame-rate independent (and speed-slider responsive),
     // capped so a 10x sim can't step further than the manifold is thick.
-    float cruise = LZ_CRUISE * clamp(fl / 3.0, 0.35, 2.2) * speedMul * min(dampScale, 4.0);
+    float cruise = LZ_CRUISE * clamp(fl / 3.0, 0.35, 2.2) * min(timeScale, 4.0);
     vec3 steered = mix(vel, dir * cruise, clamp(0.30 * timeScale, 0.0, 1.0));
     vel = mix(vel, steered, attractorStrength * (1.0 - follower));
   }
@@ -296,9 +264,9 @@ void main(){
     float halfH = (0.045 + 0.085 * r) * (1.0 + 5.0 * halo);
     float over = h - clamp(h, -halfH, halfH);
 
-    // Absolute target speeds, so the frame step and the per-particle draw have
-    // to scale them directly (capped, exactly as the attractor's cruise is).
-    float bhStep = speedMul * min(dampScale, 4.0);
+    // Absolute target speeds, so the frame step has to scale them directly
+    // (capped, exactly as the attractor's cruise is).
+    float bhStep = min(timeScale, 4.0);
     vec3 vTarget = (tang * vOrb - outward * vIn - BH_N * over * 0.12) * bhStep;
     vec3 steered = mix(vel, vTarget, clamp(0.22 * timeScale, 0.0, 1.0));
     vel = mix(vel, steered, holeStrength * (1.0 - follower));
@@ -349,10 +317,7 @@ void main(){
       vec3 flow = curlNoise(pos.xyz * noiseSize * 0.55 + vec3(chainRand * 19.0, 7.0, 3.0));
       flow.z *= 0.35; // keep the lines swirling mostly in the screen plane
       vec3 flowDir = normalize(flow + vec3(1e-5));
-      // Cruise is an absolute target speed, so the per-chain multiplier has to
-      // scale it directly — steering toward a fixed magnitude would otherwise
-      // pin every filament to the same speed no matter its draw.
-      float cruise = 0.0032 * (0.7 + 0.6 * chainRand) * speedMul;
+      float cruise = 0.0032 * (0.7 + 0.6 * chainRand);
       vec3 steered = mix(vel, flowDir * cruise, clamp(0.10 * timeScale, 0.0, 1.0));
       // Attractor mode takes the leaders over (below), so the chains trace the
       // butterfly instead of a curl field; the followers keep chasing either way.
@@ -367,10 +332,8 @@ void main(){
         // the follower's velocity converges to the closing speed instead of
         // integrating a spring (which winds up and explodes the field).
         // The repulsion floor keeps coiled chains from knotting into blobs.
-        // Scaled too, or the closing speed caps out below a fast leader's
-        // cruise and the chain stretches until it snaps apart.
         float pull = clamp(d - 0.014, -0.03, 0.03);
-        vec3 chase = (toPrev / d) * pull * 0.25 * speedMul;
+        vec3 chase = (toPrev / d) * pull * 0.25;
         vec3 followVel = mix(vel, chase, clamp(0.25 * timeScale, 0.0, 1.0));
         vel = mix(vel, followVel, follower);
       }
@@ -396,11 +359,9 @@ void main(){
   // Text-formation target attraction: spring toward per-particle target,
   // staggered by the target texel's random w, with settle damping so the
   // letters hold still once formed.
-  // Held on dampScale, not the per-particle clock: a formation's job is to hit
-  // its target and stay put, and a 10x spring here just rings around it.
   if (arrive > 0.001) {
-    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * dampScale;
-    vel *= mix(1.0, pow(0.80, dampScale), arrive * 0.9);
+    vel += (tgt.xyz - pos.xyz) * 0.06 * arrive * timeScale;
+    vel *= mix(1.0, pow(0.80, timeScale), arrive * 0.9);
   }
 
   // Release burst: scatter + recede into depth so a held formation dissolves
@@ -431,7 +392,7 @@ void main(){
     vel += (away + dir * 0.22) * reach * shockStrength * 0.115 * timeScale;
   }
 
-  vel *= pow(.97, dampScale); // dampening
+  vel *= pow(.97, timeScale); // dampening
 
   vec3 p = pos.xyz + vel;
 
