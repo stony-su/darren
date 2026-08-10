@@ -84,6 +84,7 @@ export class ParticleScene {
   private modeId = DEFAULT_MODE;
   private attractorTarget = 0;
   private holeTarget = 0;
+  private surfaceTarget = 0;
   // Latest pointer position on the z=0 plane. Tracked separately from
   // `mousePos` (which only exists while a mouse force is armed) because the
   // black hole follows the pointer whether or not one is.
@@ -184,6 +185,7 @@ export class ParticleScene {
       attractorStrength: { value: 0.0 },
       holeStrength: { value: 0.0 },
       holeCenter: { value: new THREE.Vector3(0, 0, 0) },
+      surfaceStrength: { value: 0.0 },
     };
 
     const theme0 = THEMES[0];
@@ -575,15 +577,16 @@ export class ParticleScene {
   }
 
   private applyLine(): void {
-    // Attractor and black-hole mode both outrank swirl lines. A 64-particle
-    // chain is about as long as the whole attractor, so the followers wrap
-    // right across it and smear the butterfly into an oval smudge; under the
-    // black hole a leader that falls through the horizon respawns on the rim
-    // and hauls its entire chain across the stage behind it. Project slides
+    // The modes outrank swirl lines. A 64-particle chain is about as long as
+    // the whole attractor, so the followers wrap right across it and smear
+    // the butterfly into an oval smudge; under the black hole a leader that
+    // falls through the horizon respawns on the rim and hauls its entire
+    // chain across the stage behind it; on the gyroid a chain spans several
+    // cells of the labyrinth and drapes across its walls. Project slides
     // turn lines on by themselves, so this combination is the default path
     // into a mode, not an exotic one — lines come back the moment it goes off.
     const on =
-      this.attractorTarget > 0 || this.holeTarget > 0
+      this.attractorTarget > 0 || this.holeTarget > 0 || this.surfaceTarget > 0
         ? false
         : this.panelLineMode === 'auto'
           ? this.autoLine
@@ -620,14 +623,29 @@ export class ParticleScene {
     this.modeId = id;
     const attractor = id === 'attractor' ? 1 : 0;
     const hole = id === 'blackhole' ? 1 : 0;
+    const surface = id === 'gyroid' ? 1 : 0;
     // The field re-forms onto the new manifold over a second or so — several,
     // for the black hole, which has to reel the corners of the stage in before
     // the disc exists. Keep the trails flushed until it has, or the migration
-    // smears into a whiteout.
+    // smears into a whiteout. The gyroid condenses fastest — every particle
+    // is already within half a cell of some sheet.
     if (attractor && this.attractorTarget === 0) this.post.kickDamp(0.5, 2200);
     if (hole && this.holeTarget === 0) this.post.kickDamp(0.5, 4000);
+    if (surface && this.surfaceTarget === 0) this.post.kickDamp(0.5, 2200);
+    // Leaving a concentrating mode hands the field back packed onto a thin
+    // manifold and still flying coherent paths, and curl noise alone takes ten
+    // seconds or more to spread that out — a whiteout on a glowing theme. Fire
+    // the release burst (curl scatter + a push into the depth fog) and flush
+    // the trails, the same pair a dissolving formation uses.
+    const wasConcentrated =
+      this.attractorTarget > 0 || this.holeTarget > 0 || this.surfaceTarget > 0;
+    if (wasConcentrated && !attractor && !hole && !surface) {
+      this.burst = 1;
+      this.post.kickDamp(0.45, 1800);
+    }
     this.attractorTarget = attractor;
     this.holeTarget = hole;
+    this.surfaceTarget = surface;
     this.applyLine();
   }
 
@@ -778,13 +796,16 @@ export class ParticleScene {
       this.soulUniforms.lineStrength.value =
         ls + (this.lineTarget - ls) * Math.min(1, dT * 1.1);
 
-      // Mode ramps: attractor / black hole take over the field over ~1s
+      // Mode ramps: attractor / black hole / gyroid take over the field over ~1s
       const as = this.soulUniforms.attractorStrength.value as number;
       this.soulUniforms.attractorStrength.value =
         as + (this.attractorTarget - as) * Math.min(1, dT * 1.1);
       const hs = this.soulUniforms.holeStrength.value as number;
       this.soulUniforms.holeStrength.value =
         hs + (this.holeTarget - hs) * Math.min(1, dT * 1.1);
+      const gs = this.soulUniforms.surfaceStrength.value as number;
+      this.soulUniforms.surfaceStrength.value =
+        gs + (this.surfaceTarget - gs) * Math.min(1, dT * 1.1);
       // The well lags the pointer by ~0.4s. A black hole that tracks the cursor
       // exactly reads as weightless, and a flick across the stage snaps the
       // whole disc sideways and tears it apart; trailing it drags the disc
@@ -828,12 +849,14 @@ export class ParticleScene {
         const cur = this.post.getBloomStrength();
         // The concentrating modes are the densest steady states the field has;
         // they need less bloom and shorter trails than any theme asks for, or
-        // the attractor's lobes and the black hole's inner disc fill in solid.
-        // Ramped with the mode so the switch stays smooth, and still yields to
-        // an explicit trail setting from the playground.
+        // the attractor's lobes, the black hole's inner disc and the gyroid's
+        // sheets fill in solid. Ramped with the mode so the switch stays
+        // smooth, and still yields to an explicit trail setting from the
+        // playground.
         const dense = Math.max(
           this.soulUniforms.attractorStrength.value as number,
-          this.soulUniforms.holeStrength.value as number
+          this.soulUniforms.holeStrength.value as number,
+          this.soulUniforms.surfaceStrength.value as number
         );
         const goal =
           (this.presetBloom ?? this.bloomOverride ?? target.strength) *
@@ -876,7 +899,8 @@ export class ParticleScene {
           0.55 *
             Math.max(
               this.soulUniforms.attractorStrength.value as number,
-              this.soulUniforms.holeStrength.value as number
+              this.soulUniforms.holeStrength.value as number,
+              this.soulUniforms.surfaceStrength.value as number
             ));
 
       // Release-burst decay (~1s)

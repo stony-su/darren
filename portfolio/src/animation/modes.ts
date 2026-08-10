@@ -33,6 +33,11 @@ export const MODES: ModeDef[] = [
     label: 'Black hole',
     hint: 'The pointer becomes a gravity well. The field is captured into a tilted accretion disc, inner rings shearing past outer ones, and whatever reaches the event horizon is eaten and dropped back at the rim. Takes over from swirl lines while it runs.',
   },
+  {
+    id: 'gyroid',
+    label: 'Minimal surface',
+    hint: 'The field condenses onto a gyroid — an infinite triply-periodic labyrinth — and wanders its glowing walls forever, never finding an edge. Takes over from swirl lines while it runs.',
+  },
 ];
 
 export const DEFAULT_MODE = 'off';

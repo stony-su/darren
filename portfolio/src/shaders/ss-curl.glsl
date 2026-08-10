@@ -28,6 +28,7 @@ uniform float lineStrength;
 uniform float attractorStrength; // 0 = curl chaos, 1 = Lorenz strange attractor
 uniform float holeStrength; // 0 = curl chaos, 1 = black hole owns the field
 uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
+uniform float surfaceStrength; // 0 = curl chaos, 1 = gyroid minimal surface
 
 varying vec2 vUv;
 
@@ -78,6 +79,22 @@ varying vec2 vUv;
 #define BH_N vec3(0.0, 0.3873, 0.9221)
 #define BH_U vec3(1.0, 0.0, 0.0)
 #define BH_V vec3(0.0, 0.9221, -0.3873)
+
+// Gyroid minimal surface: F(q) = sin x cos y + sin y cos z + sin z cos x = 0.
+// GY_FREQ is radians per world unit, so one cell spans 2π/GY_FREQ ≈ 1.65
+// world units — between two and three cells across the stage width, which is
+// enough for the labyrinth to read as one without shrinking its walls into
+// texture.
+#define GY_FREQ   3.8
+// Tangential wander speed (world units per frame at 60fps / 1x). Fast enough
+// that particles visibly *stream* along the walls — their motion-stretch and
+// trails are what draw the sheets as ribbons; at ambient drift speed the same
+// population reads as static clutter.
+#define GY_CRUISE 0.006
+// Cap on the descent speed toward the surface. Everything starts within half
+// a cell of *some* sheet, so even at this crawl the labyrinth condenses out
+// of the chaos in a couple of seconds.
+#define GY_SNAP   0.012
 
 // -- simplex noise chunk --
 %SIMPLEX%
@@ -153,9 +170,11 @@ void main(){
     // The attractor owns the middle of the stage (the saddle between its two
     // lobes sits on the origin), so its flow is exempt from the exclusion too.
     // So is the black hole: the well is usually parked near the middle, and an
-    // origin repulsion punches a hole straight through the inner disc.
+    // origin repulsion punches a hole straight through the inner disc. And the
+    // gyroid: its sheets pass through the origin like everywhere else, and the
+    // repulsion would blow a bald patch in the middle of the labyrinth.
     float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive)
-                  * (1.0 - max(attractorStrength, holeStrength));
+                  * (1.0 - max(attractorStrength, max(holeStrength, surfaceStrength)));
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
@@ -286,6 +305,73 @@ void main(){
       bhRespawn = holeCenter + (cos(ang) * BH_U + sin(ang) * BH_V) * rr + BH_N * lift;
       bhEaten = 1.0;
     }
+  }
+
+  // Minimal-surface mode: the field condenses onto a gyroid isosurface and
+  // then wanders along it forever — an infinite glowing labyrinth. The
+  // gradient is analytic, so the descent is a handful of instructions: one
+  // Newton step gives the signed distance to the sheet, and the curl flow is
+  // projected onto the tangent plane so particles explore *along* the surface
+  // instead of fighting it. Steered toward a target velocity like the other
+  // modes, and for the same reason: the pull must never outrun the wander, or
+  // the population stacks onto the sheet and blooms white.
+  if (surfaceStrength > 0.001) {
+    // A surface is a 2D manifold — the same density trap as the attractor.
+    // Each particle gets its own iso level on a band around zero, so the
+    // population fills a soft shell of nearby level sets instead of one
+    // razor-thin sheet. The band stays well inside ±1.4, where the gyroid's
+    // level sets pinch off and the labyrinth falls apart into blobs.
+    float iso = (rand(uv * 2.71 + vec2(3.9, 8.4)) - 0.5) * 0.6;
+    vec3 q = pos.xyz * GY_FREQ;
+    float f = sin(q.x) * cos(q.y) + sin(q.y) * cos(q.z) + sin(q.z) * cos(q.x) - iso;
+    vec3 grad = vec3(
+      cos(q.x) * cos(q.y) - sin(q.z) * sin(q.x),
+      cos(q.y) * cos(q.z) - sin(q.x) * sin(q.y),
+      cos(q.z) * cos(q.x) - sin(q.y) * sin(q.z)
+    );
+    // The gradient vanishes on the lattice of points where all three terms
+    // peak together; the floor keeps the normal finite there and the Newton
+    // step just reports a small distance, which is true enough.
+    float invg = inversesqrt(max(dot(grad, grad), 1e-4));
+    vec3 n = grad * invg;
+    // Newton step to the sheet, converted to world units (chain rule).
+    float d = f * invg / GY_FREQ;
+
+    // Wander: the curl field with its normal component removed, so the flow
+    // follows the sheet's twists. A lower frequency than the ambient chaos —
+    // the walls are ~1.5 world units apart, and noise finer than the cells
+    // reads as jitter, not as travel through the labyrinth. The seed drifts
+    // slowly: the projection is not divergence-free on the manifold, so a
+    // frozen flow herds the population into its stagnation points and the
+    // surface goes patchy; sliding the pattern keeps redealing them.
+    vec3 flow = curlNoise(pos.xyz * noiseSize * 0.6 + vec3(11.0 + uTime * 0.05, 5.0, 23.0));
+    vec3 tang = flow - n * dot(flow, n);
+    vec3 tdir = normalize(tang + vec3(1e-6));
+    // Per-particle pace spread, so the surface shimmers with relative motion
+    // instead of scrolling as one rigid texture.
+    float pace = 0.7 + 0.6 * rand(uv * 4.13 + vec2(6.2, 1.8));
+
+    // Descent speed proportional to the distance, capped — far particles
+    // approach at the cap, near ones ease in and settle instead of buzzing
+    // across the sheet every frame.
+    float vSnap = clamp(d * 0.5, -GY_SNAP, GY_SNAP);
+    float gyStep = min(timeScale, 4.0);
+    vec3 vTarget = (tdir * GY_CRUISE * pace - n * vSnap) * gyStep;
+    vec3 gySteered = mix(vel, vTarget, clamp(0.20 * timeScale, 0.0, 1.0));
+    vel = mix(vel, gySteered, surfaceStrength * (1.0 - follower));
+
+    // The sheets are infinite and the wander is a random walk along them, so
+    // without a recall the population slowly diffuses off-stage for good (the
+    // attractor and the hole recirculate by construction; this mode has to be
+    // told). Same soft box the swirl lines use: no force inside, springs back
+    // past the bounds. The spring is off-surface, but the descent term
+    // re-seats returners on the nearest sheet within a second.
+    // The z-slab is much thinner than the frustum on purpose: the labyrinth
+    // is only legible one layer at a time — give it the full depth and the
+    // camera sees three cells of walls stacked on top of each other, which
+    // scrambles the structure back into clutter.
+    vec3 gyExcess = pos.xyz - clamp(pos.xyz, vec3(-2.6, -1.5, -0.5), vec3(2.6, 1.5, 0.5));
+    vel += -gyExcess * vec3(0.0006, 0.0006, 0.0018) * surfaceStrength * timeScale;
   }
 
   // Rounded-box deflection around the visible project card. The z-mask is

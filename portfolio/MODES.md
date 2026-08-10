@@ -21,7 +21,7 @@ Two different things live there:
 |---|---|---|---|
 | 1 | **Strange attractor** ✅ | The field becomes the Lorenz system: particles ride its flow, winding out one lobe of the butterfly, flipping to the other, never repeating. | Shipped. See the constraints section below — most of them were learned here. |
 | 2 | **Black hole** ✅ | The pointer becomes a gravity well: tangential capture into an accretion disc, an event horizon that eats particles and respawns them at the rim. | Shipped. Respawn turned out not to need a dodge — see "Teleports need a flag" below. |
-| 3 | **Minimal surface** | Gradient-descend onto a gyroid isosurface (`sin x cos y + sin y cos z + sin z cos x = 0`) — particles trapped on an infinite glowing labyrinth. | Analytic gradient, so it is a handful of instructions. Project the curl noise onto the tangent plane so particles wander *along* the surface instead of fighting it. Prime whiteout risk: a surface is a 2D manifold, same density trap as the attractor. |
+| 3 | **Minimal surface** ✅ | Gradient-descend onto a gyroid isosurface (`sin x cos y + sin y cos z + sin z cos x = 0`) — particles trapped on an infinite glowing labyrinth. | Shipped. The density trap is handled by spreading the population across a band of iso levels (each particle settles on its own nearby level set, so the labyrinth is a soft shell, not a razor sheet), plus the same bloom/glow/trail dimming the other concentrating modes use. |
 | 4 | **Crystal lattice** | Particles snap to the nearest point of a 3D grid; motion quantizes and the field freezes into a shimmering solid that slowly re-tunes. | `target = round(pos / g) * g`, spring toward it. Cheap and a total change of character — the only mode here with no flow at all. Vary `g` on a slow sine for a breathing crystal. |
 | 5 | **Charged** | Half the field positive, half negative; opposites attract, likes repel, and the population knits itself into filament arcs. | True n-body is out of reach, but a coarse approximation works: sample a fixed set of texels as "distant charges", or hash to a low-res grid. Sign from the per-particle random already in the target texture's `w`. |
 | 6 | **Galaxy** | Differential rotation about a core — inner particles orbit faster, so spiral arms emerge from shear alone, no arm ever authored. | Tangential velocity ∝ 1/√r with a soft core. The arms only appear if particles keep their radius, so radial damping matters more than the tangential term. |
@@ -91,9 +91,9 @@ Learned the hard way; the code carries the same notes at the relevant lines.
 - **Concentrating modes leave a mess behind them.** Switching Chaos back on
   hands the field back packed into a fraction of the stage and still flying
   along coherent paths, and curl noise alone takes ten seconds or more to
-  spread it out — during which a glowing theme blooms white. This is true of
-  the attractor as shipped and of the black hole equally; neither currently
-  does anything about it. The fix, when someone wants it: fire the existing
-  release burst (`this.burst = 1`, a curl scatter plus a push into the depth
-  fog) and `kickDamp` the trails on mode-off, the same pair `setTextFormation`
-  already uses when a held formation lets go.
+  spread it out — during which a glowing theme blooms white. Fixed in
+  `setMode`: leaving any concentrating mode fires the existing release burst
+  (`this.burst = 1`, a curl scatter plus a push into the depth fog) and
+  `kickDamp`s the trails, the same pair `setTextFormation` uses when a held
+  formation lets go. The gyroid made this unavoidable — it packs the whole
+  population into a thin z-slab, the densest hand-back of the three.
