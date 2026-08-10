@@ -38,6 +38,11 @@ export const MODES: ModeDef[] = [
     label: 'Minimal surface',
     hint: 'The field condenses onto a gyroid — an infinite triply-periodic labyrinth — and wanders its glowing walls forever, never finding an edge. Takes over from swirl lines while it runs.',
   },
+  {
+    id: 'lattice',
+    label: 'Crystal lattice',
+    hint: 'Every particle snaps to the nearest point of a 3D grid and freezes — the field becomes a shimmering solid that slowly re-tunes as the lattice breathes. Takes over from swirl lines while it runs.',
+  },
 ];
 
 export const DEFAULT_MODE = 'off';

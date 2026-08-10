@@ -29,6 +29,7 @@ uniform float attractorStrength; // 0 = curl chaos, 1 = Lorenz strange attractor
 uniform float holeStrength; // 0 = curl chaos, 1 = black hole owns the field
 uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
 uniform float surfaceStrength; // 0 = curl chaos, 1 = gyroid minimal surface
+uniform float latticeStrength; // 0 = curl chaos, 1 = crystal lattice
 
 varying vec2 vUv;
 
@@ -95,6 +96,20 @@ varying vec2 vUv;
 // a cell of *some* sheet, so even at this crawl the labyrinth condenses out
 // of the chaos in a couple of seconds.
 #define GY_SNAP   0.012
+
+// Crystal lattice. CL_SPACING is the pitch: ~17 nodes across the stage width,
+// enough that the grid reads as a structure and each node's share of the
+// population stays a glitter, not a floodlight. The pitch breathes ±CL_BREATH
+// on a slow sine — nodes drift apart and back, and particles near the edge of
+// a cell hop to a new nearest node as the boundaries sweep past them, which
+// is the "slowly re-tunes" of the spec.
+#define CL_SPACING 0.30
+#define CL_BREATH  0.08
+#define CL_RATE    0.22
+// Each particle holds a fixed offset inside its node, as a fraction of the
+// pitch. A bare round() would stack every particle in a cell onto one point —
+// the density trap at its absolute worst, hundreds deep on a single pixel.
+#define CL_JITTER  0.18
 
 // -- simplex noise chunk --
 %SIMPLEX%
@@ -172,9 +187,11 @@ void main(){
     // So is the black hole: the well is usually parked near the middle, and an
     // origin repulsion punches a hole straight through the inner disc. And the
     // gyroid: its sheets pass through the origin like everywhere else, and the
-    // repulsion would blow a bald patch in the middle of the labyrinth.
+    // repulsion would blow a bald patch in the middle of the labyrinth. The
+    // lattice too — a grid with its central nodes blown out reads as broken.
     float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive)
-                  * (1.0 - max(attractorStrength, max(holeStrength, surfaceStrength)));
+                  * (1.0 - max(max(attractorStrength, latticeStrength),
+                               max(holeStrength, surfaceStrength)));
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
@@ -372,6 +389,30 @@ void main(){
     // scrambles the structure back into clutter.
     vec3 gyExcess = pos.xyz - clamp(pos.xyz, vec3(-2.6, -1.5, -0.5), vec3(2.6, 1.5, 0.5));
     vel += -gyExcess * vec3(0.0006, 0.0006, 0.0018) * surfaceStrength * timeScale;
+  }
+
+  // Crystal-lattice mode: every particle snaps to the nearest point of a 3D
+  // grid and freezes there — the only mode with no flow at all. The character
+  // change is carried by the damping as much as the spring: motion doesn't
+  // reroute, it *stops*, and the field reads as a solid. The pitch breathes
+  // on a slow sine, so nodes drift apart and back, and the odd particle at a
+  // cell boundary hops to a new nearest node — a crystal slowly re-tuning.
+  // No recall box needed: nothing wanders, so nothing leaks off-stage.
+  if (latticeStrength > 0.001) {
+    float g = CL_SPACING * (1.0 + CL_BREATH * sin(uTime * CL_RATE));
+    // Fixed per-particle offset inside the node (see CL_JITTER): each node is
+    // a small glittering cluster with volume, not one white point.
+    vec3 jitter = (vec3(
+      rand(uv * 3.31 + vec2(0.7, 4.2)),
+      rand(uv * 5.87 + vec2(8.1, 2.6)),
+      rand(uv * 7.43 + vec2(5.5, 9.3))
+    ) - 0.5) * g * CL_JITTER * 2.0;
+    vec3 node = floor(pos.xyz / g + 0.5) * g + jitter;
+    // Spring + hard settle damping, the formation hold's recipe. The spring
+    // is soft enough that a re-tune hop is a visible glide between nodes, and
+    // the damping is what freezes a particle once it arrives.
+    vel += (node - pos.xyz) * 0.045 * latticeStrength * timeScale;
+    vel *= mix(1.0, pow(0.82, timeScale), latticeStrength * 0.9);
   }
 
   // Rounded-box deflection around the visible project card. The z-mask is
