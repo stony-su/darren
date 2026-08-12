@@ -43,6 +43,11 @@ export const MODES: ModeDef[] = [
     label: 'Crystal lattice',
     hint: 'Every particle snaps to the nearest point of a 3D grid and freezes — the field becomes a shimmering solid that slowly re-tunes as the lattice breathes. Takes over from swirl lines while it runs.',
   },
+  {
+    id: 'charged',
+    label: 'Charged',
+    hint: 'Half the field positive, half negative. Opposites attract, likes repel, and the population knits itself into drifting filament arcs between clusters. Takes over from swirl lines while it runs.',
+  },
 ];
 
 export const DEFAULT_MODE = 'off';

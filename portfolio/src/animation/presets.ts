@@ -12,7 +12,7 @@
  * disturb obvious at a glance.
  */
 
-import { knotDrawer, starCoreDrawer } from './IntroChoreography';
+import { knotDrawer, starCoreDrawer, solarDrawer } from './IntroChoreography';
 import type { TargetDrawer } from './IntroChoreography';
 
 export interface PresetScene {
@@ -155,7 +155,34 @@ const supernovaPreset: PresetDef = {
   },
 };
 
-export const PRESETS: PresetDef[] = [supernovaPreset, knotPreset];
+/* ══════════ Solar system ══════════ */
+
+const solarPreset: PresetDef = {
+  id: 'solar',
+  label: 'Solar system',
+  hint: 'A sun with planets on real elliptical orbits. The particles chasing each planet never catch it, and the lag smears them into visible orbital rings.',
+  start(scene) {
+    scene.setFormationOffset(0, 0);
+    // Low membership is what keeps the rings *rings*: give the springs more
+    // of the field and the smears widen until neighbouring orbits merge into
+    // one solid disc.
+    scene.setFormationParticipation(0.13);
+    // The sun's disc is the app's second-densest hold after the supernova
+    // core; at theme bloom it floods the inner orbits.
+    scene.setPresetBloom(0.3);
+    scene.setTargetDrawer(solarDrawer());
+    scene.setTextFormation(true);
+    return {
+      stop(s) {
+        s.setTextFormation(false); // fires the usual scatter + shockwave
+        s.setTargetDrawer(null);
+        s.setPresetBloom(null);
+      },
+    };
+  },
+};
+
+export const PRESETS: PresetDef[] = [supernovaPreset, knotPreset, solarPreset];
 
 export function findPreset(id: string | null): PresetDef | null {
   return PRESETS.find((p) => p.id === id) ?? null;

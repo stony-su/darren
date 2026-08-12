@@ -86,6 +86,7 @@ export class ParticleScene {
   private holeTarget = 0;
   private surfaceTarget = 0;
   private latticeTarget = 0;
+  private chargedTarget = 0;
   // Latest pointer position on the z=0 plane. Tracked separately from
   // `mousePos` (which only exists while a mouse force is armed) because the
   // black hole follows the pointer whether or not one is.
@@ -188,6 +189,7 @@ export class ParticleScene {
       holeCenter: { value: new THREE.Vector3(0, 0, 0) },
       surfaceStrength: { value: 0.0 },
       latticeStrength: { value: 0.0 },
+      chargedStrength: { value: 0.0 },
     };
 
     const theme0 = THEMES[0];
@@ -593,7 +595,8 @@ export class ParticleScene {
       this.attractorTarget > 0 ||
       this.holeTarget > 0 ||
       this.surfaceTarget > 0 ||
-      this.latticeTarget > 0
+      this.latticeTarget > 0 ||
+      this.chargedTarget > 0
         ? false
         : this.panelLineMode === 'auto'
           ? this.autoLine
@@ -632,6 +635,7 @@ export class ParticleScene {
     const hole = id === 'blackhole' ? 1 : 0;
     const surface = id === 'gyroid' ? 1 : 0;
     const lattice = id === 'lattice' ? 1 : 0;
+    const charged = id === 'charged' ? 1 : 0;
     // The field re-forms onto the new manifold over a second or so — several,
     // for the black hole, which has to reel the corners of the stage in before
     // the disc exists. Keep the trails flushed until it has, or the migration
@@ -641,6 +645,7 @@ export class ParticleScene {
     if (hole && this.holeTarget === 0) this.post.kickDamp(0.5, 4000);
     if (surface && this.surfaceTarget === 0) this.post.kickDamp(0.5, 2200);
     if (lattice && this.latticeTarget === 0) this.post.kickDamp(0.5, 1800);
+    if (charged && this.chargedTarget === 0) this.post.kickDamp(0.5, 2200);
     // Leaving a concentrating mode hands the field back packed onto a thin
     // manifold and still flying coherent paths, and curl noise alone takes ten
     // seconds or more to spread that out — a whiteout on a glowing theme. Fire
@@ -650,8 +655,9 @@ export class ParticleScene {
       this.attractorTarget > 0 ||
       this.holeTarget > 0 ||
       this.surfaceTarget > 0 ||
-      this.latticeTarget > 0;
-    if (wasConcentrated && !attractor && !hole && !surface && !lattice) {
+      this.latticeTarget > 0 ||
+      this.chargedTarget > 0;
+    if (wasConcentrated && !attractor && !hole && !surface && !lattice && !charged) {
       this.burst = 1;
       this.post.kickDamp(0.45, 1800);
     }
@@ -659,6 +665,7 @@ export class ParticleScene {
     this.holeTarget = hole;
     this.surfaceTarget = surface;
     this.latticeTarget = lattice;
+    this.chargedTarget = charged;
     this.applyLine();
   }
 
@@ -822,6 +829,9 @@ export class ParticleScene {
       const cls = this.soulUniforms.latticeStrength.value as number;
       this.soulUniforms.latticeStrength.value =
         cls + (this.latticeTarget - cls) * Math.min(1, dT * 1.1);
+      const chs = this.soulUniforms.chargedStrength.value as number;
+      this.soulUniforms.chargedStrength.value =
+        chs + (this.chargedTarget - chs) * Math.min(1, dT * 1.1);
       // The well lags the pointer by ~0.4s. A black hole that tracks the cursor
       // exactly reads as weightless, and a flick across the stage snaps the
       // whole disc sideways and tears it apart; trailing it drags the disc
@@ -873,7 +883,8 @@ export class ParticleScene {
           this.soulUniforms.attractorStrength.value as number,
           this.soulUniforms.holeStrength.value as number,
           this.soulUniforms.surfaceStrength.value as number,
-          this.soulUniforms.latticeStrength.value as number
+          this.soulUniforms.latticeStrength.value as number,
+          this.soulUniforms.chargedStrength.value as number
         );
         const goal =
           (this.presetBloom ?? this.bloomOverride ?? target.strength) *
@@ -918,7 +929,8 @@ export class ParticleScene {
               this.soulUniforms.attractorStrength.value as number,
               this.soulUniforms.holeStrength.value as number,
               this.soulUniforms.surfaceStrength.value as number,
-              this.soulUniforms.latticeStrength.value as number
+              this.soulUniforms.latticeStrength.value as number,
+              this.soulUniforms.chargedStrength.value as number
             ));
 
       // Release-burst decay (~1s)

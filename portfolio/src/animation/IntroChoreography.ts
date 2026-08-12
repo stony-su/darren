@@ -419,3 +419,68 @@ export function knotDrawer(): TargetDrawer {
     ctx.globalCompositeOperation = 'source-over';
   };
 }
+
+/* ══════════ Playground preset — solar system ══════════ */
+
+/** Orbital elements. `a` is the semi-major axis in canvas px, `e` the
+ *  eccentricity, `w` the argument of perihelion (how the ellipse is turned),
+ *  `phase` where the planet starts, `r` the planet's disc radius. Periods
+ *  come from Kepler's third law below, so the inner planets visibly lap the
+ *  outer ones. */
+const SOLAR_PLANETS: { a: number; e: number; w: number; phase: number; r: number }[] = [
+  { a: 96,  e: 0.21, w: 0.6,  phase: 0.15, r: 12 },
+  { a: 150, e: 0.09, w: 2.3,  phase: 0.62, r: 15 },
+  { a: 210, e: 0.16, w: 4.1,  phase: 0.35, r: 14 },
+  { a: 288, e: 0.30, w: 1.4,  phase: 0.80, r: 17 },
+  { a: 384, e: 0.12, w: 5.2,  phase: 0.05, r: 13 },
+];
+
+/** Period of the innermost planet in seconds; the rest follow T ∝ a^1.5. */
+const SOLAR_T0 = 5.0;
+
+/**
+ * The deliberate exception to the "static targets settle, moving targets
+ * blur" rule: the planets move every frame ON PURPOSE. The particles chasing
+ * them never catch up, and the lag smears each planet into a comet tail that
+ * traces its orbit — the rings are drawn by the failure to settle.
+ *
+ * The orbits are real Kepler ellipses, sun at the focus: mean anomaly from t,
+ * eccentric anomaly by fixed-point iteration (converges fast at these
+ * eccentricities), so each planet visibly rushes through perihelion and
+ * lingers at aphelion.
+ */
+export function solarDrawer(): TargetDrawer {
+  const cx = STAGE_W / 2;
+  const cy = STAGE_H / 2;
+  // The stage canvas is 2:1 but the orbits are nearly round, so squash y —
+  // this is also what tilts the system into the "seen at an angle" look.
+  const SQUASH = 0.52;
+
+  return (ctx, t) => {
+    ctx.fillStyle = '#fff';
+
+    // Sun: a modest disc — deliberately smaller than its billing. Membership
+    // is dealt by lit area, and every pixel the sun takes is a pixel the
+    // rings lose; the bloom the preset pins low still reads it as the biggest
+    // thing on stage.
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 33, 33 * SQUASH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const p of SOLAR_PLANETS) {
+      const T = SOLAR_T0 * Math.pow(p.a / SOLAR_PLANETS[0].a, 1.5);
+      const M = ((t / T + p.phase) % 1) * Math.PI * 2;
+      // Kepler's equation M = E - e·sin E, by fixed-point iteration.
+      let E = M;
+      for (let i = 0; i < 5; i++) E = M + p.e * Math.sin(E);
+      // Position on the ellipse with the sun at the focus.
+      const ox = p.a * (Math.cos(E) - p.e);
+      const oy = p.a * Math.sqrt(1 - p.e * p.e) * Math.sin(E);
+      const x = cx + ox * Math.cos(p.w) - oy * Math.sin(p.w);
+      const y = cy + (ox * Math.sin(p.w) + oy * Math.cos(p.w)) * SQUASH;
+      ctx.beginPath();
+      ctx.ellipse(x, y, p.r, p.r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+}

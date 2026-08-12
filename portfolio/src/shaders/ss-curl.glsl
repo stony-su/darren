@@ -30,6 +30,7 @@ uniform float holeStrength; // 0 = curl chaos, 1 = black hole owns the field
 uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
 uniform float surfaceStrength; // 0 = curl chaos, 1 = gyroid minimal surface
 uniform float latticeStrength; // 0 = curl chaos, 1 = crystal lattice
+uniform float chargedStrength; // 0 = curl chaos, 1 = two-sign plasma
 
 varying vec2 vUv;
 
@@ -111,6 +112,21 @@ varying vec2 vUv;
 // the density trap at its absolute worst, hundreds deep on a single pixel.
 #define CL_JITTER  0.18
 
+// Charged mode. True n-body is out of reach, so a fixed 6x4 grid of texels is
+// sampled as roving macro-charges: each is some particle's live position with
+// a fixed random sign, and every particle feels only those 24. The field they
+// make is coarse but it *moves* — clusters of one sign herd particles of the
+// other, and the population knits into arcs between them.
+#define CH_COLS  6.0
+#define CH_ROWS  4.0
+// Softening length (squared distance floor). Sets the collapse scale: an
+// attracted pair orbits inside this radius instead of falling to a point.
+#define CH_SOFT  0.09
+// Per-sample force scale. The 1/r^2 sum spans orders of magnitude, so this is
+// tuned at the terminal-velocity level: near a macro-charge the pull saturates
+// against the global drag at roughly the ambient drift speed.
+#define CH_FORCE 0.000016
+
 // -- simplex noise chunk --
 %SIMPLEX%
 
@@ -189,9 +205,12 @@ void main(){
     // gyroid: its sheets pass through the origin like everywhere else, and the
     // repulsion would blow a bald patch in the middle of the labyrinth. The
     // lattice too — a grid with its central nodes blown out reads as broken.
+    // And the plasma: an arc bending around an invisible bubble gives the
+    // trick away.
     float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive)
                   * (1.0 - max(max(attractorStrength, latticeStrength),
-                               max(holeStrength, surfaceStrength)));
+                               max(chargedStrength,
+                                   max(holeStrength, surfaceStrength))));
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
@@ -413,6 +432,39 @@ void main(){
     // the damping is what freezes a particle once it arrives.
     vel += (node - pos.xyz) * 0.045 * latticeStrength * timeScale;
     vel *= mix(1.0, pow(0.82, timeScale), latticeStrength * 0.9);
+  }
+
+  // Charged mode: half the field positive, half negative, opposites attract
+  // and likes repel. Applied as an accumulated force rather than the other
+  // modes' steering, because the interesting structure IS the acceleration —
+  // particles falling along field lines, swinging past clusters, knitting
+  // into filament arcs between opposite-signed groups. The curl jitter keeps
+  // running underneath, which is what stops the arcs from collapsing into a
+  // static diagram.
+  if (chargedStrength > 0.001) {
+    // This particle's sign, from its own fixed random draw. The macro-charge
+    // signs below use the same formula at the sample's uv, so a macro-charge
+    // is consistent frame to frame even though it rides a moving particle.
+    float qi = sign(rand(uv * 9.17 + vec2(2.4, 7.7)) - 0.5);
+    vec3 chAcc = vec3(0.0);
+    for (int j = 0; j < 24; j++) {
+      float fj = float(j);
+      vec2 suv = (vec2(mod(fj, CH_COLS), floor(fj / CH_COLS)) + 0.5)
+                 / vec2(CH_COLS, CH_ROWS);
+      vec3 pj = texture2D(t_pos, suv).xyz;
+      float qj = sign(rand(suv * 9.17 + vec2(2.4, 7.7)) - 0.5);
+      vec3 to = pj - pos.xyz;
+      float d2 = dot(to, to) + CH_SOFT;
+      // -qi*qj: opposite signs pull toward pj, like signs push away.
+      chAcc += to * (-qi * qj) * inversesqrt(d2) / d2;
+    }
+    vel += chAcc * CH_FORCE * chargedStrength * timeScale;
+
+    // Like-signed particles near a like-signed cluster are pushed outward
+    // with nothing calling them back, so the same soft recall box the other
+    // roaming modes use (full frustum depth — the arcs use it).
+    vec3 chExcess = pos.xyz - clamp(pos.xyz, vec3(-2.6, -1.5, -0.9), vec3(2.6, 1.5, 0.9));
+    vel += -chExcess * vec3(0.0006, 0.0006, 0.0012) * chargedStrength * timeScale;
   }
 
   // Rounded-box deflection around the visible project card. The z-mask is
