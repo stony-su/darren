@@ -2,10 +2,14 @@ export interface Project {
   title: string;
   description: string;
   image?: string;
+  /** Additional screenshots; with `image` they form a dot-switcher gallery. */
+  images?: string[];
   video?: string;
   tags: string[];
   liveUrl?: string;
   repoUrl?: string;
+  /** Allow the in-card "Live preview" iframe (site must permit framing). */
+  embed?: boolean;
   theme: number; // 0-4 maps to color themes
 }
 
@@ -18,6 +22,7 @@ export const PROJECTS: Project[] = [
     tags: ['Next.js', 'Three.js', 'Tailwind CSS', 'Supabase'],
     liveUrl: 'https://fblc-26.vercel.app/',
     repoUrl: 'https://github.com/B-Eddie/fblc-26',
+    embed: true,
     theme: 0,
   },
   {
@@ -44,9 +49,11 @@ export const PROJECTS: Project[] = [
     description:
       'Maps Routes - A proof of concept app for Calgary’s mobile grocery bus business.',
     image: '/pictures/websites/shadbus.jpg',
+    images: ['/pictures/websites/chrome_cL5et3zIG2.jpg'],
     tags: ['React', 'Tailwind CSS', 'Firebase', 'Google Translate API'],
     liveUrl: 'https://shadbusv2.vercel.app/',
     repoUrl: 'https://github.com/stony-su/shadbusv2',
+    embed: true,
     theme: 3,
   },
   {
@@ -56,6 +63,7 @@ export const PROJECTS: Project[] = [
     tags: ['HTML', 'CSS', 'PHP', 'JS'],
     liveUrl: 'https://stony-su.github.io/personal-website/',
     repoUrl: 'https://github.com/stony-su/personal-website/tree/main',
+    embed: true,
     theme: 4,
   },
   {
@@ -66,6 +74,7 @@ export const PROJECTS: Project[] = [
     tags: ['Three.js'],
     liveUrl: 'https://vinyl-turntable.vercel.app/',
     repoUrl: 'https://github.com/stony-su/vinyl-turntable',
+    embed: true,
     theme: 2,
   },
 ];

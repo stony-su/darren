@@ -37,6 +37,8 @@ export class ProjectSlideshow {
   private lastFocused: HTMLElement | null = null;
   private currentIndex = 0;
   private lastScrollLeft = 0;
+  private ghostEls: HTMLElement[] = [];
+  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private scrollRafPending = false;
   private hashTimer: number | null = null;
   private destroyed = false;
@@ -94,9 +96,16 @@ export class ProjectSlideshow {
     this.currentIndex = initial;
     this.lastScrollLeft = initial * window.innerWidth;
 
+    // Ghost titles sit behind the cards; parallax offsets update on scroll
+    this.ghostEls = Array.from(this.slideshowEl.querySelectorAll<HTMLElement>('.ghost-title'));
+    this.updateGhostParallax();
+
     this.setupScrollTracking();
     this.setupWheelRedirect();
     this.setupVideoScrubbers();
+    this.setupCardTilt();
+    this.setupGalleries();
+    this.setupLivePreviews();
 
     window.addEventListener('keydown', this.boundKeyHandler, { signal: this.ac.signal });
     window.addEventListener('resize', this.boundResizeHandler, { signal: this.ac.signal });
@@ -162,6 +171,7 @@ export class ProjectSlideshow {
 
         // Particles track the visible card even mid-scroll
         this.updateCardRect();
+        this.updateGhostParallax();
       });
     }, { passive: true });
   }
@@ -170,6 +180,13 @@ export class ProjectSlideshow {
     if (this.destroyed) return;
     this.currentIndex = index;
     const isEdge = index === 0 || index === this.slideCount - 1;
+
+    // Live-preview iframes are heavy (some run their own WebGL) — only the
+    // current slide keeps one alive.
+    const slides = this.slideshowEl.querySelectorAll('.slide');
+    this.slideshowEl.querySelectorAll<HTMLElement>('.project-media.previewing').forEach((m) => {
+      if (m.closest('.slide') !== slides[index]) this.closePreview(m);
+    });
 
     this.scene.setTheme(this.themeForSlide(index));
     // Project slides always use their theme's bloom (the intro's last line
@@ -186,6 +203,9 @@ export class ProjectSlideshow {
 
     this.onIndexChange?.(index);
     this.updateCardRect();
+    // Programmatic jumps (deep links, goTo) don't always fire a scroll event
+    // before the next paint — sync the ghosts here too.
+    this.updateGhostParallax();
 
     // Debounced hash update
     if (this.hashTimer !== null) window.clearTimeout(this.hashTimer);
@@ -197,10 +217,11 @@ export class ProjectSlideshow {
   private updateCardRect(): void {
     const slides = this.slideshowEl.querySelectorAll('.slide');
     const slide = slides[this.currentIndex];
-    // Title/Contact have no card, just centred copy — deflect around that
-    // instead, or the field settles straight over the text now that those
-    // slides no longer gather it out of the way.
-    const card = slide?.querySelector('.project-card, .slide-copy');
+    // Only the project cards deflect. Title/Contact are centred copy, and a
+    // deflection box around that sits on the middle of the stage — it reads as
+    // the field being blown outward from the centre of the screen rather than
+    // as flow around anything. Those two slides run the field unaltered.
+    const card = slide?.querySelector('.project-card');
     this.scene.setCardRect(card ? card.getBoundingClientRect() : null);
   }
 
@@ -210,6 +231,18 @@ export class ProjectSlideshow {
     this.slideshowEl.scrollLeft = this.currentIndex * window.innerWidth;
     this.slideshowEl.style.scrollBehavior = '';
     this.updateCardRect();
+    this.updateGhostParallax();
+  }
+
+  /** Ghost titles drift slower than the cards, reading as a layer behind. */
+  private updateGhostParallax(): void {
+    if (this.reducedMotion) return;
+    const left = this.slideshowEl.scrollLeft;
+    const w = window.innerWidth;
+    this.ghostEls.forEach((el, i) => {
+      const offset = (i + 1) * w - left; // ghost i belongs to slide i+1
+      el.style.setProperty('--ghost-par', `${(-offset * 0.3).toFixed(1)}px`);
+    });
   }
 
   /* ── Wheel: accumulated-delta with cooldown (trackpad-friendly) ── */
@@ -252,6 +285,15 @@ export class ProjectSlideshow {
       if (e.key === 'Escape') {
         e.preventDefault();
         this.closeGrid();
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      const open = this.slideshowEl.querySelector<HTMLElement>('.project-media.previewing');
+      if (open) {
+        e.preventDefault();
+        this.closePreview(open);
       }
       return;
     }
@@ -403,10 +445,15 @@ export class ProjectSlideshow {
   private createProjectSlide(project: Project, index: number): HTMLElement {
     const slide = document.createElement('section');
     slide.setAttribute('aria-label', project.title);
+    // overflow-hidden: the ghost title bleeds past the slide edges, and any
+    // spill would widen the scroll container.
     slide.className =
-      'slide snap-center shrink-0 w-screen h-dvh flex items-center justify-center p-6 md:p-12';
+      'slide relative overflow-hidden snap-center shrink-0 w-screen h-dvh flex items-center justify-center p-6 md:p-12';
 
     const css = THEMES[project.theme].css;
+
+    // Huge outline title behind the card; sized so long titles still fit.
+    const ghostSize = `min(15vw, ${(170 / project.title.length).toFixed(1)}vw)`;
 
     const tagsHtml = project.tags
       .map((tag) => `<span class="inline-block px-3 py-1 rounded-full text-xs font-body ${css.tagClass}">${tag}</span>`)
@@ -425,10 +472,12 @@ export class ProjectSlideshow {
     const textOrder = isEven ? 'order-2' : 'order-2 lg:order-1';
 
     slide.innerHTML = `
+      <div class="ghost-title font-display italic" aria-hidden="true"
+           style="--ghost-accent: ${css.accent}; font-size: ${ghostSize}">${project.title}</div>
       <div class="project-card w-full max-w-5xl backdrop-blur-md bg-black/30 border ${css.borderClass} rounded-3xl overflow-hidden shadow-2xl">
         <div class="flex flex-col lg:flex-row">
           <div class="${imageOrder} lg:w-1/2">
-            <div class="aspect-video lg:aspect-auto lg:h-full max-h-[58dvh] overflow-hidden relative">
+            <div class="project-media aspect-video lg:aspect-auto lg:h-full max-h-[58dvh] overflow-hidden relative">
               ${this.createMediaHtml(project)}
             </div>
           </div>
@@ -443,6 +492,7 @@ export class ProjectSlideshow {
             ${linksHtml}
           </div>
         </div>
+        <div class="card-glare" aria-hidden="true"></div>
       </div>
     `;
 
@@ -465,8 +515,119 @@ export class ProjectSlideshow {
         </div>
       `;
     }
-    return `<img src="${project.image ?? ''}" alt="${project.title} screenshot"
-                 class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />`;
+
+    const previewBtn = project.embed && project.liveUrl
+      ? `
+        <button type="button" class="live-preview-btn font-body"
+                data-url="${project.liveUrl}"
+                aria-label="Toggle live preview of ${project.title}">
+          <span class="lp-dot" aria-hidden="true"></span>
+          <span class="lp-label">Live preview</span>
+        </button>
+      `
+      : '';
+
+    const shots = [project.image, ...(project.images ?? [])].filter(Boolean) as string[];
+    if (shots.length > 1) {
+      const imgs = shots
+        .map(
+          (src, i) => `
+            <img src="${src}" alt="${project.title} screenshot ${i + 1}"
+                 class="gallery-img absolute inset-0 w-full h-full object-cover${i === 0 ? ' is-active' : ''}" />`
+        )
+        .join('');
+      const dots = shots
+        .map(
+          (_, i) => `
+            <button type="button" class="gallery-dot${i === 0 ? ' is-active' : ''}"
+                    aria-label="Screenshot ${i + 1} of ${shots.length}"></button>`
+        )
+        .join('');
+      return `
+        <div class="media-gallery absolute inset-0">
+          ${imgs}
+          <div class="gallery-dots">${dots}</div>
+        </div>
+        ${previewBtn}
+      `;
+    }
+
+    return `
+      <img src="${shots[0] ?? ''}" alt="${project.title} screenshot"
+           class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
+      ${previewBtn}
+    `;
+  }
+
+  /* ── Screenshot galleries ── */
+
+  private setupGalleries(): void {
+    this.slideshowEl.querySelectorAll<HTMLElement>('.media-gallery').forEach((gallery) => {
+      const imgs = gallery.querySelectorAll('.gallery-img');
+      const dots = gallery.querySelectorAll<HTMLElement>('.gallery-dot');
+      dots.forEach((dot, i) => {
+        dot.addEventListener('click', () => {
+          imgs.forEach((img, j) => img.classList.toggle('is-active', i === j));
+          dots.forEach((d, j) => d.classList.toggle('is-active', i === j));
+        });
+      });
+    });
+  }
+
+  /* ── Pointer tilt + specular glare ── */
+
+  private setupCardTilt(): void {
+    if (this.reducedMotion || window.matchMedia('(hover: none)').matches) return;
+    this.slideshowEl.querySelectorAll<HTMLElement>('.project-card').forEach((card) => {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+        card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+        card.style.setProperty('--ry', `${((x - 0.5) * 4.5).toFixed(2)}deg`);
+        card.style.setProperty('--rx', `${((0.5 - y) * 3.5).toFixed(2)}deg`);
+      });
+      card.addEventListener('pointerleave', () => {
+        card.style.setProperty('--rx', '0deg');
+        card.style.setProperty('--ry', '0deg');
+      });
+    });
+  }
+
+  /* ── Live preview iframes ── */
+
+  private setupLivePreviews(): void {
+    this.slideshowEl.querySelectorAll<HTMLElement>('.live-preview-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const media = btn.closest<HTMLElement>('.project-media');
+        if (!media) return;
+        if (media.classList.contains('previewing')) {
+          this.closePreview(media);
+        } else {
+          this.openPreview(media, btn);
+        }
+      });
+    });
+  }
+
+  private openPreview(media: HTMLElement, btn: HTMLElement): void {
+    const frame = document.createElement('iframe');
+    frame.src = btn.dataset.url!;
+    frame.className = 'live-frame';
+    frame.title = 'Live preview';
+    frame.setAttribute('referrerpolicy', 'no-referrer');
+    media.insertBefore(frame, btn);
+    media.classList.add('previewing');
+    btn.querySelector('.lp-label')!.textContent = 'Close preview';
+    requestAnimationFrame(() => frame.classList.add('on'));
+  }
+
+  private closePreview(media: HTMLElement): void {
+    media.querySelector('.live-frame')?.remove();
+    media.classList.remove('previewing');
+    const label = media.querySelector('.live-preview-btn .lp-label');
+    if (label) label.textContent = 'Live preview';
   }
 
   private setupVideoScrubbers(): void {

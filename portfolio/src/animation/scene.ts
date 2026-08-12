@@ -173,6 +173,7 @@ export class ParticleScene {
       mouseForce: { value: 0.0 },
       t_target: { value: null },
       targetStrength: { value: 0.0 },
+      formationHold: { value: 0.0 },
       formationParticipation: { value: 0.45 },
       cardCenter: { value: new THREE.Vector3(0, 0, 0) },
       cardHalfSize: { value: new THREE.Vector2(0.5, 0.35) },
@@ -438,6 +439,7 @@ export class ParticleScene {
     this.drawer = null;
     this.targetStrengthGoal = 0;
     this.soulUniforms.targetStrength.value = 0;
+    this.soulUniforms.formationHold.value = 0;
     this.soulUniforms.t_target.value = null;
     this.targetTexture?.dispose();
     this.targetTexture = null;
@@ -915,6 +917,17 @@ export class ParticleScene {
       const tsGoal = goalActive ? this.targetStrengthGoal : 0;
       this.soulUniforms.targetStrength.value =
         ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 0.9 : 3.0));
+
+      // The spring's own gate. It tracks the ramp on the way in, but a release
+      // cuts it to zero on the spot instead of riding the ramp back down: the
+      // burst and the shockwave are what dissolve a formation, and they are
+      // both spent long before the ramp is. A spring still tugging (with its
+      // settle damping, which brakes hard) as the shockwave fades stops the
+      // scattering particles mid-flight and then lets go of them a second time
+      // — one release that reads on screen as two.
+      this.soulUniforms.formationHold.value = goalActive
+        ? (this.soulUniforms.targetStrength.value as number)
+        : 0;
 
       // Held formations dim their palette glow so dense shapes read as color
       // instead of blooming to white (the DARREN theme has glow 0 already).

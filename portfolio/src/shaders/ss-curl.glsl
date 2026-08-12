@@ -10,6 +10,7 @@ uniform vec2  resolution;
 
 uniform sampler2D t_target;
 uniform float targetStrength;
+uniform float formationHold; // spring gate: tracks targetStrength in, snaps to 0 on release
 uniform float formationParticipation; // fraction of particles that join a formation
 
 uniform vec3  cardCenter;
@@ -184,7 +185,11 @@ void main(){
   if (targetStrength > 0.001) {
     tgt = texture2D(t_target, uv);
     participate = step(tgt.w, formationParticipation);
-    arrive = clamp(targetStrength * 1.6 - fract(tgt.w * 7.0) * 0.5, 0.0, 1.0) * participate;
+    // The spring rides `formationHold`, not the raw ramp: on release the hold
+    // is zero from the first frame, so the shockwave and the burst scatter the
+    // shape in one continuous throw. (The ramp keeps fading — the glow and the
+    // depth drift are still tied to it, and snapping those pops.)
+    arrive = clamp(formationHold * 1.6 - fract(tgt.w * 7.0) * 0.5, 0.0, 1.0) * participate;
     // A shockwave overrides the formation hold. Without this the settle
     // damping further down (x0.80/frame while arrive is high) eats the kick
     // on the very frames it is strongest, and the shape only swells a little

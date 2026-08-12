@@ -92,18 +92,178 @@ body {
   transition: opacity 0.6s ease;
 }
 
-/* ── Project Card Animations ── */
+/* ── Project Card: pointer tilt + lift ── */
 
 .project-card {
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+  position: relative;
+  z-index: 1;
+  transform: perspective(1100px)
+             rotateX(var(--rx, 0deg))
+             rotateY(var(--ry, 0deg))
+             translateY(var(--lift, 0px));
+  transition: transform 0.18s ease-out,
               box-shadow 0.5s ease;
 }
 
 .project-card:hover {
-  transform: translateY(-4px) rotate(-0.3deg);
+  --lift: -4px;
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.4),
     0 0 80px -20px rgba(100, 100, 255, 0.08);
+}
+
+/* Specular sweep following the pointer */
+.card-glare {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    640px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.09),
+    transparent 45%
+  );
+}
+
+.project-card:hover .card-glare {
+  opacity: 1;
+}
+
+/* ── Ghost breakout title (behind the card, parallax on scroll) ── */
+
+.ghost-title {
+  position: absolute;
+  top: clamp(0.5rem, 5dvh, 3.5rem);
+  left: 50%;
+  z-index: 0;
+  white-space: nowrap;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ghost-accent, var(--accent)) 5%, transparent);
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--ghost-accent, var(--accent)) 34%, transparent);
+  transform: translateX(calc(-50% + var(--ghost-par, 0px)));
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* ── Screenshot gallery (dot switcher) ── */
+
+.media-gallery .gallery-img {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.media-gallery .gallery-img.is-active {
+  opacity: 1;
+}
+
+.gallery-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 7px;
+  z-index: 6;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gallery-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: background 0.25s ease, width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gallery-dot:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.gallery-dot.is-active {
+  width: 22px;
+  background: #fff;
+}
+
+/* Previews cover the gallery; hide its dots while one is open */
+.project-media.previewing .gallery-dots {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Live preview (embedded site) ── */
+
+.live-preview-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease, transform 0.15s ease;
+}
+
+.live-preview-btn:hover,
+.live-preview-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.live-preview-btn:active {
+  transform: scale(0.95);
+}
+
+.lp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80;
+  animation: lpPulse 2s ease-in-out infinite;
+}
+
+@keyframes lpPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.live-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0c0c16;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.live-frame.on {
+  opacity: 1;
 }
 
 /* ── Slide Title ── */
@@ -526,6 +686,20 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .project-card {
+    transform: none;
+  }
+
+  .lp-dot {
+    animation: none;
+  }
+
+  .media-gallery .gallery-img,
+  .gallery-dot,
+  .live-frame {
+    transition-duration: 0.01s;
+  }
+
   .view-all-btn,
   .va-icon,
   .grid-overlay,
