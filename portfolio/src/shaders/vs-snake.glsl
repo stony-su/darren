@@ -6,8 +6,8 @@ uniform sampler2D t_ooPos;
 uniform float uSnowflake;
 uniform float uStretch;
 uniform float uLineStrength;
-uniform float uAttractor;
-uniform float uHole;
+uniform float uFlow;       // strength of whichever mode is flying the field
+//                            along smooth coherent paths (modes.ts `flow`)
 
 varying vec3 vNorm;
 varying vec2 vLookup;
@@ -36,10 +36,11 @@ void main(){
 
   vSpeed = length( d1 );
 
-  // Filament lines, attractor mode and black-hole mode all move particles
-  // along smooth, nearly straight paths, which is exactly what the legacy
-  // frame below can't render — so they share one rig blend.
-  float rig = max( uLineStrength, max( uAttractor, uHole ) );
+  // Filament lines and the flow modes — an attractor lobe, an orbit, a field
+  // line, a falling grain — all move particles along smooth, nearly straight
+  // paths, which is exactly what the legacy frame below can't render, so they
+  // share one rig blend.
+  float rig = max( uLineStrength, uFlow );
 
   vec3 z = vSpeed > 1e-8 ? normalize( d1 ) : vec3( 0.0, 0.0, 1.0 );
   vec3 xr = cross( z , normalize( d2 + vec3( 1e-7 ) ) );

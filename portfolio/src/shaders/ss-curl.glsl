@@ -32,6 +32,16 @@ uniform vec3  holeCenter;   // world-space gravity well (the eased pointer)
 uniform float surfaceStrength; // 0 = curl chaos, 1 = gyroid minimal surface
 uniform float latticeStrength; // 0 = curl chaos, 1 = crystal lattice
 uniform float chargedStrength; // 0 = curl chaos, 1 = two-sign plasma
+uniform float galaxyStrength;  // 0 = curl chaos, 1 = differentially rotating disc
+uniform float murmurStrength;  // 0 = curl chaos, 1 = boid flocks
+uniform float auroraStrength;  // 0 = curl chaos, 1 = rippling curtains
+uniform float dipoleStrength;  // 0 = curl chaos, 1 = magnetic dipole
+uniform float sedimentStrength;// 0 = curl chaos, 1 = falling / settling snow
+// Rolled up scene-side so the shader never has to spell the whole roster out:
+// anyMode is the largest of the strengths above, flowStrength the largest
+// among the modes that move particles along smooth coherent paths.
+uniform float anyMode;
+uniform float flowStrength;
 
 varying vec2 vUv;
 
@@ -128,6 +138,126 @@ varying vec2 vUv;
 // against the global drag at roughly the ambient drift speed.
 #define CH_FORCE 0.000016
 
+// Galaxy. Orbit speed goes as 1/sqrt(r) about a softened core, so inner rings
+// lap the outer ones — differential rotation, and the shear that comes with
+// it. Shear alone will not draw an arm out of a smooth disc though: there is
+// no overdensity for it to pull on. The arms are where the orbits *crowd*
+// instead — every particle rides a slightly oval orbit, and each oval is
+// turned a little further round than the one inside it, so neighbouring ovals
+// converge along two lanes. That is Lindblad's kinematic density wave, and it
+// is also the standard answer to why real arms don't wind themselves shut: the
+// lane pattern turns slowly and rigidly while the particles stream through it
+// at whatever pace their own radius sets.
+#define GX_RADIUS  1.00   // outer edge of the disc, world units
+#define GX_CORE    0.28   // where solid-body rotation hands over to Keplerian
+#define GX_ORBIT   0.026  // tangential speed at exactly that radius
+#define GX_ECC     0.28   // how oval each orbit is; sets the arms' contrast
+// Radians of apsidal turn per world unit of radius — i.e. how tightly the arms
+// wind. The crowding an oval set produces is broad and smooth, never a thin
+// lane, so an arm that only sweeps half a turn across the disc does not read
+// as an arm at all: it reads as one of two lobes, and the galaxy comes out
+// looking like two discs that collided. It takes better than a full turn
+// before the eye calls it a spiral. GX_TWIST * GX_RADIUS is that total sweep,
+// in radians.
+#define GX_TWIST   8.00
+#define GX_PATTERN 0.045  // rigid turn rate of the arm pattern, rad per sim second
+// The radial term is a spring onto the particle's own oval, not a free fall:
+// the arms only exist while particles ride their ovals, so of the two terms
+// this is the one that has to win. Both are sized against the radial speed
+// tracking an oval actually needs (2*a*e*omega, a hundredth of a world unit
+// per frame or so): set the cap far under it and the ovals are smoothed back
+// into circles, the crowding goes, and the arms with it — set it far over and
+// the population chases its ovals hard enough to bunch into two lobes and stop
+// being a disc at all.
+#define GX_PULL    0.06
+#define GX_RMAX    0.011
+// Disc axis, tilted ~24 degrees off the camera — the same trick, and nearly
+// the same angle, as the black hole's accretion plane: face-on the disc has no
+// depth to read, edge-on it is a line. GX_U/GX_V span the disc plane.
+#define GX_N vec3(0.0, 0.4067, 0.9135)
+#define GX_U vec3(1.0, 0.0, 0.0)
+#define GX_V vec3(0.0, 0.9135, -0.4067)
+
+// Murmuration. Boids need neighbours, and a GPGPU sim has no way to ask which
+// particles are near: texture-space neighbours are unrelated in world space.
+// So the filament rig's topology gets borrowed instead of its rendering — the
+// same CHAIN-long runs of consecutive texels become flocks, and because a
+// flock stays together in the air, its members ARE each other's spatial
+// neighbours. MU_SAMPLES of them are read per particle (a different handful
+// for each, so the whole flock stays coupled) and the three classic rules run
+// over that sample.
+#define MU_SAMPLES 6
+#define MU_SEP     0.10   // inside this a neighbour is crowding; push off it
+#define MU_CRUISE  0.011  // flocks hold a near-constant airspeed
+#define MU_TURN    0.10   // how sharply a bird can answer its neighbours
+// Rule weights. They only matter against each other — the sum is normalized to
+// a direction and flown at MU_CRUISE, which is what keeps a flock a flock
+// instead of a cloud that happens to be moving.
+#define MU_COHERE  0.9
+#define MU_SEPARATE 0.010
+#define MU_ALIGN   20.0
+// Pull toward the flock's own roost, a point drifting on a slow curl of its
+// own. Without it flocks mill in place; with it they cross the stage and the
+// local rules only take over once they arrive.
+#define MU_ROOST   0.10
+
+// Aurora. Particles are confined to a few vertical curtains: each is a sheet
+// x = f(z, t) spanning the full height, and each particle belongs to one sheet
+// for good. Seen from the camera a sheet is edge-on, so its whole depth
+// projects onto a band — and piles up into a bright line wherever f turns
+// around, because there the sheet is momentarily facing the lens. Those
+// caustics are the folds, and the folds are the entire effect, which is why
+// the ripple carries a travelling *and* a standing component: a purely
+// travelling wave slides past like a flag and its turning points never move.
+#define AU_CURTAINS 3.0
+#define AU_SPREAD   1.25  // half-width the curtains' base positions span
+#define AU_TRAVEL   0.42  // amplitude of the travelling ripple
+#define AU_STAND    0.30  // amplitude of the standing one
+#define AU_KZ       4.4   // ripple wavenumber along depth
+#define AU_SPEED    0.5
+#define AU_PULL     0.05  // spring onto the sheet
+#define AU_RISE     0.0055// upward streaming speed along the curtain
+#define AU_BOTTOM  -1.25
+#define AU_TOP      1.30
+// Depth slab. Shallower than the frustum: past z ~ -0.9 the fog has the
+// particles anyway, and the curtain wants to fade out at the back, not stop.
+#define AU_ZNEAR   -0.95
+#define AU_ZFAR     0.45
+
+// Dipole. B ~ 3(m.r)r - m: closed form, a handful of instructions, and the
+// shape everyone has seen in iron filings. Two problems come with it. The
+// magnitude goes as 1/r^3, so the field is used for its direction only and the
+// speed is a flat cruise (the same steering the attractor uses, for the same
+// reason). And the field lines converge to a point at each pole, which would
+// stack the population onto two pixels — the density trap in its purest form.
+// The fix is the physics that keeps the real radiation belts from raining into
+// the poles: a particle spiralling down a converging field is turned around at
+// its mirror point. Each one carries a fixed mirror latitude and bounces
+// between the two, so the poles brighten instead of swallowing.
+#define DP_AXIS   vec3(0.2588, 0.9659, 0.0) // tilted 15deg, like a planet's
+#define DP_CRUISE 0.012
+#define DP_INNER  0.24    // the "planet": no field line is drawn inside it
+#define DP_OUTER  1.15    // past this, particles sink onto smaller shells
+#define DP_CROSS  0.0045  // how fast that cross-field drift moves them
+
+// Sediment. Gravity, a terminal velocity, and wind shear that only the high
+// air feels: the field falls, drifts, and banks up against an invisible floor.
+// Settling is the interesting half. Particles do not collide, so a bare floor
+// plane stacks the whole population into one flat sheet — so each particle
+// carries a fixed slot in the bank instead (a depth into it, under a dune
+// profile that gives its top some shape) and rests there.
+#define SD_TERM   0.011   // terminal fall speed
+#define SD_SHEAR  0.0016  // horizontal drift, strongest high up
+#define SD_FLOOR -1.12
+#define SD_PILE   0.34    // thickness of the settled bank
+#define SD_EMIT   1.45    // re-emit height, just off the top of the frame
+// Nothing tracks how long a grain has rested, so the lift back into the sky is
+// a dice roll re-thrown SD_TICK times a second. At these numbers a grain waits
+// in the bank about twice as long as it spends falling, which leaves a third
+// of the field in the air at any moment and the snowfall never runs out.
+#define SD_TICK    2.5
+#define SD_RECYCLE 0.055
+
 // -- simplex noise chunk --
 %SIMPLEX%
 
@@ -146,11 +276,18 @@ void main(){
 
   vec3 vel = pos.xyz - oPos.xyz;
   // Velocity is implicit in the two position buffers, so a position that did
-  // not come from the one before it — the black hole's horizon respawn is the
-  // only one — reads here as a single stage-crossing step. The sim flags such
-  // a write by putting 0 in the w channel (1 otherwise); that particle simply
-  // restarts from rest, and the field it lands in accelerates it again.
+  // not come from the one before it — a respawn, a re-emit, a wrap — reads
+  // here as a single stage-crossing step. The sim flags such a write by
+  // putting 0 in the w channel (1 otherwise); that particle simply restarts
+  // from rest, and the field it lands in accelerates it again.
   vel *= step(0.5, pos.w);
+
+  // Any mode that writes a position instead of integrating one parks it here,
+  // and the tail of main() applies it and sets the flag. Three do: the black
+  // hole eating at its horizon, the aurora re-emitting a spent ray at the foot
+  // of its curtain, and sediment lifting a grain out of the bank.
+  float warped = 0.0;
+  vec3 warpPos = vec3(0.0);
 
   // Time-based speed multiplier
   float timeScale = dT * 60.0;
@@ -203,19 +340,17 @@ void main(){
   vec3 toCenter = pos.xyz;
   float dist = length(toCenter);
   if (dist > 0.001) {
-    // The attractor owns the middle of the stage (the saddle between its two
-    // lobes sits on the origin), so its flow is exempt from the exclusion too.
-    // So is the black hole: the well is usually parked near the middle, and an
-    // origin repulsion punches a hole straight through the inner disc. And the
-    // gyroid: its sheets pass through the origin like everywhere else, and the
-    // repulsion would blow a bald patch in the middle of the labyrinth. The
-    // lattice too — a grid with its central nodes blown out reads as broken.
-    // And the plasma: an arc bending around an invisible bubble gives the
-    // trick away.
+    // Every mode is exempt, which is why this reads `anyMode` rather than a
+    // list. The attractor owns the middle of the stage (the saddle between its
+    // two lobes sits on the origin); the black hole's well is usually parked
+    // near it and an origin repulsion punches a hole straight through the
+    // inner disc; the gyroid's sheets pass through the origin like everywhere
+    // else, and a bald patch in the middle of the labyrinth reads as broken —
+    // as does a lattice with its central nodes blown out, a plasma arc bending
+    // round an invisible bubble, a galaxy with no core, or a dipole with
+    // nothing at the poles.
     float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive)
-                  * (1.0 - max(max(attractorStrength, latticeStrength),
-                               max(chargedStrength,
-                                   max(holeStrength, surfaceStrength))));
+                  * (1.0 - anyMode);
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 
@@ -283,8 +418,6 @@ void main(){
   // shader states outright — v ~ 1/sqrt(r), so inner rings visibly shear past
   // outer ones, which is the whole reason the disc reads as a disc and not a
   // ring of confetti.
-  float bhEaten = 0.0;
-  vec3 bhRespawn = vec3(0.0);
   if (holeStrength > 0.001) {
     vec3 rel = pos.xyz - holeCenter;
     float r = length(rel);
@@ -343,8 +476,8 @@ void main(){
       // Halo particles come back into the halo, or the disc slowly eats it.
       float lift = (rand(uv * 5.13 + vec2(fract(uTime * 0.23), 8.1)) - 0.5)
                    * (0.10 + 1.6 * halo);
-      bhRespawn = holeCenter + (cos(ang) * BH_U + sin(ang) * BH_V) * rr + BH_N * lift;
-      bhEaten = 1.0;
+      warpPos = holeCenter + (cos(ang) * BH_U + sin(ang) * BH_V) * rr + BH_N * lift;
+      warped = 1.0;
     }
   }
 
@@ -472,6 +605,245 @@ void main(){
     vel += -chExcess * vec3(0.0006, 0.0006, 0.0012) * chargedStrength * timeScale;
   }
 
+  // Galaxy mode: a disc turning about its own core. See the GX_ block above for
+  // where the spiral arms come from — the short version is that they are not
+  // drawn, they are the lanes where neighbouring oval orbits crowd together.
+  // Steered toward a target velocity like the other flow modes; no recall box,
+  // because every particle is springing onto an orbit that fits on stage.
+  if (galaxyStrength > 0.001) {
+    // Disc-plane coordinates about the origin.
+    float gh = dot(pos.xyz, GX_N);
+    vec3 gPlanar = pos.xyz - GX_N * gh;
+    float gr = length(gPlanar);
+    vec3 gOut = gr > 1e-5 ? gPlanar / gr : GX_U;
+    // Unit by construction: GX_N is unit and gOut lies in the plane it norms.
+    vec3 gTan = cross(GX_N, gOut);
+
+    // This particle's own orbit. The mean radius is a fixed draw, shaped so
+    // the disc comes out mildly centre-heavy rather than as an even pancake
+    // with a pinhole of whiteout in the middle (a uniform draw in radius would
+    // do exactly that — surface density goes as 1/r).
+    float ga = GX_RADIUS * pow(rand(uv * 6.29 + vec2(1.3, 7.9)), 0.62);
+    float gTheta = atan(dot(pos.xyz, GX_V), dot(pos.xyz, GX_U));
+    // The oval, and the apsidal turn that stacks the ovals into arms. The
+    // whole pattern also rotates rigidly, so the lanes sweep while particles
+    // stream through them at their own radius's pace.
+    float gWant = ga * (1.0 - GX_ECC
+      * cos(2.0 * (gTheta - GX_TWIST * ga - uTime * GX_PATTERN)));
+
+    // Solid-body rotation inside the core, Keplerian outside — which is what
+    // real rotation curves do, and also the only way the middle survives. At a
+    // constant *linear* speed the turn per frame blows up as r -> 0, the
+    // steering (which only closes a fifth of the gap each frame) cannot follow
+    // it, and every particle inside a few tenths gets thrown out on the chord:
+    // the galaxy comes out as a ring with a hole punched through the bulge.
+    // The min() picks whichever law is slower and they meet exactly at GX_CORE.
+    float gOrb = GX_ORBIT * min(gr / GX_CORE, sqrt(GX_CORE / max(gr, 1e-4)));
+    float gRad = clamp((gWant - gr) * GX_PULL, -GX_RMAX, GX_RMAX);
+
+    // Flare the disc's half-thickness with radius, exactly as the black hole
+    // does and for the same reason: driving every particle onto the plane is
+    // the whiteout again. The extra term at small radius is the bulge — the
+    // core is a rounder swarm, not a thinner disc.
+    float gHalf = 0.03 + 0.05 * gr + 0.13 * (1.0 - smoothstep(0.0, 0.45, gr));
+    float gOver = gh - clamp(gh, -gHalf, gHalf);
+
+    // Aim inward of the tangent. Steering is first order, so the velocity is
+    // always a few frames behind the direction it is chasing — and on a circle
+    // "a few frames behind the tangent" is a chord, which points outward. The
+    // tighter the orbit the worse it gets, until the inner radii fling
+    // themselves out faster than GX_RMAX can reel them back and the bulge
+    // comes out as a hole. Offsetting the aim by the angle the lag costs
+    // (roughly the turn rate times the steering's ~5-frame time constant)
+    // cancels it, and costs nothing out in the disc where the lag is tiny.
+    float gLag = min(gOrb / max(gr, 1e-3) * 5.0, 1.2);
+    vec3 gAim = normalize(gTan - gOut * gLag);
+
+    float gStep = min(timeScale, 4.0);
+    vec3 vTarget = (gAim * gOrb + gOut * gRad - GX_N * gOver * 0.10) * gStep;
+    vec3 gSteered = mix(vel, vTarget, clamp(0.20 * timeScale, 0.0, 1.0));
+    vel = mix(vel, gSteered, galaxyStrength * (1.0 - follower));
+  }
+
+  // Murmuration mode: boids over the filament rig's chains (see the MU_ block
+  // above for why the chains are the neighbourhood). Three rules — cohesion,
+  // separation, alignment — plus a roost the whole flock drifts toward, summed
+  // and then flown as a direction at a fixed airspeed. The normalize is what
+  // makes it read as birds: a bird answers its neighbours by *turning*, not by
+  // speeding up, and a flock that varies its speed comes apart into a cloud.
+  if (murmurStrength > 0.001) {
+    vec3 muPos = vec3(0.0);
+    vec3 muVel = vec3(0.0);
+    vec3 muSep = vec3(0.0);
+    for (int j = 0; j < MU_SAMPLES; j++) {
+      // Strided across the chain so the sample spans the whole flock, and
+      // offset by this particle's own slot so no two birds watch the same set.
+      float k = mod(posInChain + 1.0 + floor(float(j) * (CHAIN / float(MU_SAMPLES))), CHAIN);
+      float nIdx = chainId * CHAIN + k;
+      vec2 nUv = (vec2(mod(nIdx, texW), floor(nIdx / texW)) + 0.5) / resolution;
+      vec4 nPos = texture2D(t_pos, nUv);
+      vec4 nOld = texture2D(t_oPos, nUv);
+      muPos += nPos.xyz;
+      muVel += (nPos.xyz - nOld.xyz) * step(0.5, nPos.w);
+      vec3 away = pos.xyz - nPos.xyz;
+      float d2 = dot(away, away) + 1e-4;
+      // Only crowding neighbours push; the falloff is the usual inverse
+      // square, so the push is negligible until they are genuinely close.
+      muSep += away * step(d2, MU_SEP * MU_SEP) / d2;
+    }
+    float inv = 1.0 / float(MU_SAMPLES);
+
+    // Each flock's roost drifts on a curl of its own, seeded by the chain, so
+    // the flocks travel independently instead of all converging on one point.
+    vec3 roost = curlNoise(vec3(chainRand * 31.0, uTime * 0.03, 7.0))
+                 * vec3(1.9, 0.95, 0.5);
+
+    vec3 steer = (muPos * inv - pos.xyz) * MU_COHERE
+               + muSep * MU_SEPARATE
+               + muVel * inv * MU_ALIGN
+               + (roost - pos.xyz) * MU_ROOST;
+    vec3 muDir = normalize(steer + vec3(1e-5));
+    vec3 vTarget = muDir * MU_CRUISE * min(timeScale, 4.0);
+    vec3 muSteered = mix(vel, vTarget, clamp(MU_TURN * timeScale, 0.0, 1.0));
+    vel = mix(vel, muSteered, murmurStrength * (1.0 - follower));
+  }
+
+  // Aurora mode: a few vertical curtains, rippling on a travelling plus a
+  // standing wave (see the AU_ block above for why it needs both). Only x is
+  // constrained — the sheet is a function of depth, and the particle is free
+  // to stream up it. Reaching its own top, a ray is re-emitted at the foot of
+  // the curtain; because each carries a different ceiling, the population
+  // thins out with height instead of stopping in a line.
+  if (auroraStrength > 0.001) {
+    float ci = floor(rand(uv * 8.11 + vec2(4.4, 1.2)) * AU_CURTAINS);
+    // Golden-angle stagger, so no two curtains ever ripple in step.
+    float phase = ci * 2.39996;
+    float base = (ci / max(AU_CURTAINS - 1.0, 1.0) - 0.5) * 2.0 * AU_SPREAD;
+    float sheetX = base
+      + AU_TRAVEL * sin(AU_KZ * pos.z + uTime * AU_SPEED + phase)
+      + AU_STAND * sin(AU_KZ * 1.6 * pos.z + phase * 1.7)
+                 * sin(uTime * AU_SPEED * 0.61 + phase);
+
+    // Damped spring onto the sheet. The sheet moves under the particle, which
+    // is what drags the curtain sideways as the wave travels.
+    vel.x += (sheetX - pos.x) * AU_PULL * auroraStrength * timeScale;
+    vel.x *= mix(1.0, pow(0.86, timeScale), auroraStrength);
+
+    // Stream upward at a per-particle pace, so rays shear past each other.
+    float pace = 0.6 + 0.8 * rand(uv * 4.77 + vec2(1.9, 6.3));
+    float vUp = AU_RISE * pace * min(timeScale, 4.0);
+    vel.y = mix(vel.y, vUp, clamp(0.15 * timeScale, 0.0, 1.0) * auroraStrength);
+
+    // Keep the sheet inside its depth slab; z is otherwise left to the curl,
+    // which is what slowly re-deals the folds.
+    float zEx = pos.z - clamp(pos.z, AU_ZNEAR, AU_ZFAR);
+    vel.z += -zEx * 0.0025 * auroraStrength * timeScale;
+
+    float ceiling = mix(AU_BOTTOM + 0.35, AU_TOP, rand(uv * 6.61 + vec2(3.3, 7.1)));
+    if (auroraStrength > 0.5 && pos.y > ceiling && arrive < 0.5) {
+      float seed = fract(uTime * 0.41);
+      warpPos = vec3(
+        sheetX,
+        AU_BOTTOM + rand(uv * 2.83 + vec2(seed, 4.9)) * 0.12,
+        mix(AU_ZNEAR, AU_ZFAR, rand(uv * 9.07 + vec2(1.1, seed)))
+      );
+      warped = 1.0;
+    }
+  }
+
+  // Dipole mode: particles ride a magnetic dipole's field lines, bouncing
+  // between their own mirror points rather than piling into the poles (see the
+  // DP_ block above). Direction only — the 1/r^3 magnitude is thrown away and
+  // the speed is a flat cruise, the same trick the attractor uses.
+  if (dipoleStrength > 0.001) {
+    float dr = max(length(pos.xyz), 1e-4);
+    vec3 rHat = pos.xyz / dr;
+    float cosT = dot(rHat, DP_AXIS);
+    vec3 bHat = normalize(3.0 * cosT * rHat - DP_AXIS + vec3(1e-6));
+
+    // Which way along the line this particle is going. Nothing stores it, but
+    // the velocity is the state — read the direction back out of it.
+    float s = dot(vel, bHat) >= 0.0 ? 1.0 : -1.0;
+    // Mirror. Along +B the colatitude only ever grows (dot(B, grad cos0) works
+    // out to -sin^2(0)/|B|, never positive), so +B always heads south and -B
+    // north: a particle past its northern mirror is sent along +B and one past
+    // its southern mirror along -B, and neither reaches a pole.
+    float mirror = 0.62 + 0.33 * rand(uv * 2.17 + vec2(7.3, 3.8));
+    if (abs(cosT) > mirror) s = cosT > 0.0 ? 1.0 : -1.0;
+
+    // The only term that crosses field lines, and the only reason the belt
+    // stays on stage: too far out and a particle sinks onto a smaller shell,
+    // inside the planet and it is pushed back off it.
+    float shell = smoothstep(DP_OUTER, DP_OUTER + 0.9, dr)
+                - (1.0 - smoothstep(DP_INNER, DP_INNER + 0.12, dr));
+
+    vec3 vTarget = (bHat * s * DP_CRUISE - rHat * shell * DP_CROSS)
+                   * min(timeScale, 4.0);
+    // Steered harder than the other modes. Field lines near the planet turn
+    // faster than the belt travels, and a first-order chase that lags them by
+    // several frames drifts off the line outward — the same lag that hollows
+    // out the galaxy's core, here emptying the middle of the belt.
+    vec3 dpSteered = mix(vel, vTarget, clamp(0.45 * timeScale, 0.0, 1.0));
+    vel = mix(vel, dpSteered, dipoleStrength * (1.0 - follower));
+
+    // Squeeze the belt toward the screen plane. The field is axisymmetric, so
+    // a particle already in the plane through the axis never leaves it and the
+    // slab costs nothing — but left in full 3D the lines fan out through every
+    // azimuth at once and the projection stacks them into an unreadable
+    // vortex. Held near one plane they read as the diagram everyone knows.
+    float dpZ = pos.z - clamp(pos.z, -0.26, 0.26);
+    vel.z += -dpZ * 0.004 * dipoleStrength * timeScale;
+  }
+
+  // Sediment mode: the field falls, drifts and settles (see the SD_ block
+  // above). Two behaviours under one uniform, split by whether a grain has
+  // reached its slot in the bank: airborne it steers toward a terminal fall
+  // plus shear, settled it springs into the slot and brakes hard — the
+  // lattice's freeze, which is what makes the bank read as a solid.
+  if (sedimentStrength > 0.001) {
+    // The bank's top: a couple of standing dunes, fixed in place so the drift
+    // has a shape instead of a straight edge.
+    float bank = SD_FLOOR + SD_PILE
+      * (0.55 + 0.45 * sin(pos.x * 1.9 + 0.7) * cos(pos.x * 0.8 - 1.3));
+    // Depth of this grain's slot into the bank, fixed for good.
+    float rest = mix(SD_FLOOR, bank, rand(uv * 5.41 + vec2(3.1, 8.8)));
+    float settled = 1.0 - smoothstep(0.0, 0.09, pos.y - rest);
+
+    // Airborne. The shear reverses on a slow sine, which is what stops the
+    // whole snowfall from leaning the same way forever; the ambient wind
+    // uniform is still blowing underneath, so a scroll gust still shows.
+    float shear = SD_SHEAR * smoothstep(SD_FLOOR, SD_EMIT, pos.y)
+                  * (0.35 + 0.65 * sin(uTime * 0.13));
+    // Per-grain flutter, so they do not fall in columns.
+    float flutter = sin(uTime * 1.3 + rand(uv * 3.19 + vec2(6.6, 2.9)) * 62.8) * 0.0009;
+    vec3 fall = vec3(shear + flutter, -SD_TERM, 0.0) * min(timeScale, 4.0);
+    vec3 sdSteered = mix(vel, fall, clamp(0.05 * timeScale, 0.0, 1.0));
+    vel = mix(vel, sdSteered, sedimentStrength * (1.0 - settled) * (1.0 - follower));
+
+    // Settled.
+    float hold = sedimentStrength * settled;
+    vel.y += (rest - pos.y) * 0.05 * hold * timeScale;
+    vel *= mix(1.0, pow(0.80, timeScale), hold * 0.9);
+
+    // Lift back into the sky. The floor()'d seed re-throws the dice SD_TICK
+    // times a second; everything else about the grain's wait is memoryless.
+    // Wrapped, because the seed feeds a sin()-based hash and an unbounded one
+    // runs out of float precision after a few minutes on screen — at which
+    // point the "dice" quietly stop being random and the bank stops emptying.
+    // Every other clock-driven hash in this file is bounded for the same
+    // reason (the black hole's respawn takes a fract() of uTime).
+    float tick = mod(floor(uTime * SD_TICK), 512.0);
+    if (sedimentStrength > 0.5 && settled > 0.5 && arrive < 0.5
+        && rand(uv * 7.93 + vec2(tick, 5.2)) > 1.0 - SD_RECYCLE) {
+      warpPos = vec3(
+        (rand(uv * 1.37 + vec2(tick, 9.4)) - 0.5) * 5.2,
+        SD_EMIT + rand(uv * 4.51 + vec2(8.2, tick)) * 0.35,
+        -1.0 + rand(uv * 8.69 + vec2(tick, 0.6)) * 1.4
+      );
+      warped = 1.0;
+    }
+  }
+
   // Rounded-box deflection around the visible project card. The z-mask is
   // asymmetric: wide on the camera side (anything glowing between the card
   // and the lens washes out its text through the backdrop blur), narrow on
@@ -482,13 +854,14 @@ void main(){
     float sd = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - cardRadius;
     float dz = pos.z - cardCenter.z;
     float zMask = dz > 0.0 ? smoothstep(1.7, 0.2, dz) : smoothstep(0.9, 0.15, -dz);
-    // Softened under the attractor: at full strength the deflection fountains a
-    // steady plume of particles off the top of the frame, since the flow keeps
-    // feeding the card's neighbourhood. This much still carves a readable hole
-    // around the copy without the leak. The black hole feeds the card the same
-    // way — every orbit sweeps the population back past it.
+    // Softened under the flow modes: at full strength the deflection fountains
+    // a steady plume of particles off the top of the frame, since the flow
+    // keeps feeding the card's neighbourhood. This much still carves a readable
+    // hole around the copy without the leak. Every mode that circulates the
+    // population — an attractor lobe, an orbit, a curtain, a falling grain —
+    // feeds the card the same way.
     float deflect = smoothstep(0.18, -0.05, sd) * cardStrength * zMask
-                    * (1.0 - 0.6 * max(attractorStrength, holeStrength));
+                    * (1.0 - 0.6 * flowStrength);
     vel += normalize(vec3(rel, 0.0) + vec3(0.0, 0.0, 1e-5)) * deflect * 0.0009 * timeScale;
   }
 
@@ -503,9 +876,10 @@ void main(){
       vec3 flowDir = normalize(flow + vec3(1e-5));
       float cruise = 0.0032 * (0.7 + 0.6 * chainRand);
       vec3 steered = mix(vel, flowDir * cruise, clamp(0.10 * timeScale, 0.0, 1.0));
-      // Attractor mode takes the leaders over (below), so the chains trace the
-      // butterfly instead of a curl field; the followers keep chasing either way.
-      vel = mix(vel, steered, lineStrength * (1.0 - attractorStrength));
+      // A mode takes the leaders over (above), so during the crossfade out of
+      // line mode the chains trace whatever it built rather than a curl field;
+      // the followers keep chasing either way.
+      vel = mix(vel, steered, lineStrength * (1.0 - anyMode));
     } else {
       float prevIdx = idx - 1.0;
       vec2 prevUv = (vec2(mod(prevIdx, texW), floor(prevIdx / texW)) + 0.5) / resolution;
@@ -582,11 +956,11 @@ void main(){
   vec3 p = pos.xyz + vel;
 
   // w = 1 for a position integrated from the previous one, 0 for a position
-  // written from nowhere (a black-hole respawn). Consumers of the two position
-  // buffers difference them to get velocity, so they need to be told.
+  // written from nowhere. Consumers of the two position buffers difference
+  // them to get velocity, so they need to be told.
   float continuous = 1.0;
-  if (bhEaten > 0.5) {
-    p = bhRespawn;
+  if (warped > 0.5) {
+    p = warpPos;
     continuous = 0.0;
   }
 

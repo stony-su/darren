@@ -8,7 +8,7 @@ import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
 import { loadSettings } from './settings';
 import type { MouseMode, LineMode } from './settings';
-import { DEFAULT_MODE } from './modes';
+import { DEFAULT_MODE, MODE_FIELDS, isModeId } from './modes';
 import { findPreset } from './presets';
 import type { PresetRunner } from './presets';
 import { THEMES, bgToRgb } from '../theme/themes';
@@ -25,6 +25,21 @@ import fsSnakeGlsl from '../shaders/fs-snake.glsl?raw';
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
+
+/** How long each mode takes to condense the field onto whatever it builds, in
+ *  ms — the window the trails stay flushed for on the way in. The gyroid and
+ *  the lattice are fastest (every particle already sits within half a cell of
+ *  somewhere to settle); the black hole and the dipole are slowest, since both
+ *  have to haul the corners of the stage inward before their structure exists
+ *  at all. 2200 is the default for anything not listed. */
+const MODE_SETTLE_MS: Record<string, number> = {
+  blackhole: 4000,
+  dipole: 3600,
+  galaxy: 2800,
+  sediment: 2600,
+  aurora: 2400,
+  lattice: 1800,
+};
 
 /**
  * Main particle animation scene: Three.js renderer, GPGPU curl particle
@@ -80,13 +95,10 @@ export class ParticleScene {
   private panelLineMode: LineMode = 'auto';
   private simTime = 0;
 
-  // Modes (persistent physics changes) + presets (scripted scenarios)
+  // Modes (persistent physics changes) + presets (scripted scenarios).
+  // Only the id is state: every mode's strength uniform ramps toward 1 if it
+  // is the active one and 0 otherwise, so a switch cross-fades.
   private modeId = DEFAULT_MODE;
-  private attractorTarget = 0;
-  private holeTarget = 0;
-  private surfaceTarget = 0;
-  private latticeTarget = 0;
-  private chargedTarget = 0;
   // Latest pointer position on the z=0 plane. Tracked separately from
   // `mousePos` (which only exists while a mouse force is armed) because the
   // black hole follows the pointer whether or not one is.
@@ -185,13 +197,17 @@ export class ParticleScene {
       shockStrength: { value: 0.0 },
       uTime: { value: 0.0 },
       lineStrength: { value: 0.0 },
-      attractorStrength: { value: 0.0 },
-      holeStrength: { value: 0.0 },
       holeCenter: { value: new THREE.Vector3(0, 0, 0) },
-      surfaceStrength: { value: 0.0 },
-      latticeStrength: { value: 0.0 },
-      chargedStrength: { value: 0.0 },
+      // Rolled up from the per-mode strengths below, once a frame: `anyMode`
+      // is the largest of them, `flowStrength` the largest among the modes
+      // that fly the field along coherent paths. Saves the sim (and the two
+      // render shaders, which share flowStrength) from spelling out a roster
+      // that grows every time a mode ships.
+      anyMode: { value: 0.0 },
+      flowStrength: { value: 0.0 },
     };
+    // One 0..1 strength per mode (modes.ts owns the names).
+    for (const f of MODE_FIELDS) this.soulUniforms[f.uniform] = { value: 0.0 };
 
     const theme0 = THEMES[0];
     this.bodyUniforms = {
@@ -211,8 +227,7 @@ export class ParticleScene {
       uFogFar: { value: 3.0 },
       // Shared objects with the sim uniforms — one value drives both shaders
       uLineStrength: this.soulUniforms.lineStrength,
-      uAttractor: this.soulUniforms.attractorStrength,
-      uHole: this.soulUniforms.holeStrength,
+      uFlow: this.soulUniforms.flowStrength,
     };
 
     this.tier = pickTier();
@@ -279,7 +294,7 @@ export class ParticleScene {
     const force = this.soulUniforms.mouseForce.value as number;
     // Skipped entirely when nothing wants the pointer — but black-hole mode
     // always does, since the well *is* the pointer.
-    if (force === 0 && this.holeTarget === 0) return;
+    if (force === 0 && this.modeId !== 'blackhole') return;
     this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
@@ -583,22 +598,21 @@ export class ParticleScene {
   }
 
   private applyLine(): void {
-    // The modes outrank swirl lines. A 64-particle chain is about as long as
+    // Every mode outranks swirl lines. A 64-particle chain is about as long as
     // the whole attractor, so the followers wrap right across it and smear
     // the butterfly into an oval smudge; under the black hole a leader that
     // falls through the horizon respawns on the rim and hauls its entire
     // chain across the stage behind it; on the gyroid a chain spans several
     // cells of the labyrinth and drapes across its walls; in the lattice the
     // followers chase leaders that refuse to move, and the chains crumple
-    // into knots between nodes. Project slides turn lines on by themselves,
-    // so this combination is the default path into a mode, not an exotic
-    // one — lines come back the moment it goes off.
+    // into knots between nodes; a chain draped across an aurora curtain or a
+    // galaxy's arms erases the very lane it is meant to sit in. Murmuration
+    // is the one that *keeps* the chains — but as flock membership, not as a
+    // line to draw, so the rendering still has to go. Project slides turn
+    // lines on by themselves, so this combination is the default path into a
+    // mode, not an exotic one — lines come back the moment it goes off.
     const on =
-      this.attractorTarget > 0 ||
-      this.holeTarget > 0 ||
-      this.surfaceTarget > 0 ||
-      this.latticeTarget > 0 ||
-      this.chargedTarget > 0
+      this.modeId !== DEFAULT_MODE
         ? false
         : this.panelLineMode === 'auto'
           ? this.autoLine
@@ -632,42 +646,25 @@ export class ParticleScene {
   /** Switch the field's physics (see modes.ts). Unknown ids fall back to the
    *  default, so a stale saved setting can never wedge the scene. */
   setMode(id: string): void {
-    this.modeId = id;
-    const attractor = id === 'attractor' ? 1 : 0;
-    const hole = id === 'blackhole' ? 1 : 0;
-    const surface = id === 'gyroid' ? 1 : 0;
-    const lattice = id === 'lattice' ? 1 : 0;
-    const charged = id === 'charged' ? 1 : 0;
+    const next = isModeId(id) ? id : DEFAULT_MODE;
+    const prev = this.modeId;
+    if (next === prev) return;
+    this.modeId = next;
     // The field re-forms onto the new manifold over a second or so — several,
     // for the black hole, which has to reel the corners of the stage in before
-    // the disc exists. Keep the trails flushed until it has, or the migration
-    // smears into a whiteout. The gyroid and the lattice condense fastest —
-    // every particle is already within half a cell of somewhere to settle.
-    if (attractor && this.attractorTarget === 0) this.post.kickDamp(0.5, 2200);
-    if (hole && this.holeTarget === 0) this.post.kickDamp(0.5, 4000);
-    if (surface && this.surfaceTarget === 0) this.post.kickDamp(0.5, 2200);
-    if (lattice && this.latticeTarget === 0) this.post.kickDamp(0.5, 1800);
-    if (charged && this.chargedTarget === 0) this.post.kickDamp(0.5, 2200);
-    // Leaving a concentrating mode hands the field back packed onto a thin
-    // manifold and still flying coherent paths, and curl noise alone takes ten
-    // seconds or more to spread that out — a whiteout on a glowing theme. Fire
-    // the release burst (curl scatter + a push into the depth fog) and flush
-    // the trails, the same pair a dissolving formation uses.
-    const wasConcentrated =
-      this.attractorTarget > 0 ||
-      this.holeTarget > 0 ||
-      this.surfaceTarget > 0 ||
-      this.latticeTarget > 0 ||
-      this.chargedTarget > 0;
-    if (wasConcentrated && !attractor && !hole && !surface && !lattice && !charged) {
+    // the disc exists, and for the dipole, whose only cross-field term is the
+    // slow drift that pulls distant particles onto a smaller shell. Keep the
+    // trails flushed until it has, or the migration smears into a whiteout.
+    if (next !== DEFAULT_MODE) this.post.kickDamp(0.5, MODE_SETTLE_MS[next] ?? 2200);
+    // Leaving a mode hands the field back packed onto a thin manifold and
+    // still flying coherent paths, and curl noise alone takes ten seconds or
+    // more to spread that out — a whiteout on a glowing theme. Fire the
+    // release burst (curl scatter + a push into the depth fog) and flush the
+    // trails, the same pair a dissolving formation uses.
+    if (prev !== DEFAULT_MODE && next === DEFAULT_MODE) {
       this.burst = 1;
       this.post.kickDamp(0.45, 1800);
     }
-    this.attractorTarget = attractor;
-    this.holeTarget = hole;
-    this.surfaceTarget = surface;
-    this.latticeTarget = lattice;
-    this.chargedTarget = charged;
     this.applyLine();
   }
 
@@ -707,10 +704,17 @@ export class ParticleScene {
     this.presetBloom = strength;
   }
 
-  /** Preset hook: fire a shockwave centred on the formation stage. */
-  shockwave(strength: number): void {
-    const { offX, offY } = this.formationStage();
-    (this.soulUniforms.shockCenter.value as THREE.Vector3).set(offX, offY, 0);
+  /** Preset hook: fire a shockwave centred on the formation stage, or offset
+   *  within it — x/y are fractions of the stage rect (0 its middle, ±0.5 its
+   *  edges, y up). Fireworks needs the offset: the sim carries a single shock
+   *  centre, so several bangs have to be fired one after another. */
+  shockwave(strength: number, stageX = 0, stageY = 0): void {
+    const { offX, offY, stageW, stageH } = this.formationStage();
+    (this.soulUniforms.shockCenter.value as THREE.Vector3).set(
+      offX + stageX * stageW,
+      offY + stageY * stageH,
+      0
+    );
     this.shock = Math.max(this.shock, strength);
   }
 
@@ -818,22 +822,27 @@ export class ParticleScene {
       this.soulUniforms.lineStrength.value =
         ls + (this.lineTarget - ls) * Math.min(1, dT * 1.1);
 
-      // Mode ramps: attractor / black hole / gyroid take over the field over ~1s
-      const as = this.soulUniforms.attractorStrength.value as number;
-      this.soulUniforms.attractorStrength.value =
-        as + (this.attractorTarget - as) * Math.min(1, dT * 1.1);
-      const hs = this.soulUniforms.holeStrength.value as number;
-      this.soulUniforms.holeStrength.value =
-        hs + (this.holeTarget - hs) * Math.min(1, dT * 1.1);
-      const gs = this.soulUniforms.surfaceStrength.value as number;
-      this.soulUniforms.surfaceStrength.value =
-        gs + (this.surfaceTarget - gs) * Math.min(1, dT * 1.1);
-      const cls = this.soulUniforms.latticeStrength.value as number;
-      this.soulUniforms.latticeStrength.value =
-        cls + (this.latticeTarget - cls) * Math.min(1, dT * 1.1);
-      const chs = this.soulUniforms.chargedStrength.value as number;
-      this.soulUniforms.chargedStrength.value =
-        chs + (this.chargedTarget - chs) * Math.min(1, dT * 1.1);
+      // Mode ramps: the active mode takes the field over in ~1s while whatever
+      // was running hands it back on the same curve, so a switch cross-fades
+      // rather than snapping. The three rollups fall out of the same pass —
+      // `any` and `flow` go to the shaders, `dense` drives the bloom, trail
+      // and glow compensation below.
+      const modeK = Math.min(1, dT * 1.1);
+      let anyMode = 0;
+      let flow = 0;
+      let dense = 0;
+      for (const f of MODE_FIELDS) {
+        const u = this.soulUniforms[f.uniform];
+        const cur = u.value as number;
+        const s = cur + ((this.modeId === f.id ? 1 : 0) - cur) * modeK;
+        u.value = s;
+        anyMode = Math.max(anyMode, s);
+        if (f.flow) flow = Math.max(flow, s);
+        dense = Math.max(dense, s * f.dense);
+      }
+      this.soulUniforms.anyMode.value = anyMode;
+      this.soulUniforms.flowStrength.value = flow;
+
       // The well lags the pointer by ~0.4s. A black hole that tracks the cursor
       // exactly reads as weightless, and a flick across the stage snaps the
       // whole disc sideways and tears it apart; trailing it drags the disc
@@ -878,16 +887,9 @@ export class ParticleScene {
         // The concentrating modes are the densest steady states the field has;
         // they need less bloom and shorter trails than any theme asks for, or
         // the attractor's lobes, the black hole's inner disc and the gyroid's
-        // sheets fill in solid. Ramped with the mode so the switch stays
-        // smooth, and still yields to an explicit trail setting from the
-        // playground.
-        const dense = Math.max(
-          this.soulUniforms.attractorStrength.value as number,
-          this.soulUniforms.holeStrength.value as number,
-          this.soulUniforms.surfaceStrength.value as number,
-          this.soulUniforms.latticeStrength.value as number,
-          this.soulUniforms.chargedStrength.value as number
-        );
+        // sheets fill in solid. Weighted per mode (modes.ts `dense`) and ramped
+        // with it so the switch stays smooth, and still yielding to an explicit
+        // trail setting from the playground.
         const goal =
           (this.presetBloom ?? this.bloomOverride ?? target.strength) *
           this.bloomMult *
@@ -936,15 +938,7 @@ export class ParticleScene {
       // same whiteout by another road.
       this.bodyUniforms.uFormationGlow.value =
         (1 - 0.85 * (this.soulUniforms.targetStrength.value as number)) *
-        (1 -
-          0.55 *
-            Math.max(
-              this.soulUniforms.attractorStrength.value as number,
-              this.soulUniforms.holeStrength.value as number,
-              this.soulUniforms.surfaceStrength.value as number,
-              this.soulUniforms.latticeStrength.value as number,
-              this.soulUniforms.chargedStrength.value as number
-            ));
+        (1 - 0.55 * dense);
 
       // Release-burst decay (~1s)
       if (this.burst > 0.001) {

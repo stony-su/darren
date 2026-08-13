@@ -12,7 +12,25 @@
  * disturb obvious at a glance.
  */
 
-import { knotDrawer, starCoreDrawer, solarDrawer } from './IntroChoreography';
+import {
+  knotDrawer,
+  starCoreDrawer,
+  solarDrawer,
+  dnaDrawer,
+  hourglassDrawer,
+  fireworksDrawer,
+  clockDrawer,
+  ekgDrawer,
+  mobiusDrawer,
+  oceanDrawer,
+  HOURGLASS_POUR,
+  HOURGLASS_CYCLE,
+  FIREWORKS_LOOP,
+  FIREWORKS_BURSTS,
+  EKG_BEAT,
+  EKG_R_PHASE,
+  ekgSpikeAt,
+} from './IntroChoreography';
 import type { TargetDrawer } from './IntroChoreography';
 
 export interface PresetScene {
@@ -22,8 +40,10 @@ export interface PresetScene {
   setTextFormation(active: boolean, releaseShock?: number): void;
   /** Bloom strength for the duration of the preset (null = back to the theme). */
   setPresetBloom(strength: number | null): void;
-  /** Fire a shockwave centred on the formation stage (0..1). */
-  shockwave(strength: number): void;
+  /** Fire a shockwave (0..1), centred on the formation stage or offset within
+   *  it — `stageX`/`stageY` are fractions of the stage rect, 0 being its
+   *  middle and ±0.5 its edges, y up. */
+  shockwave(strength: number, stageX?: number, stageY?: number): void;
   /** Briefly flush motion trails, so a bright transition doesn't smear. */
   kickTrails(damp: number, durationMs: number): void;
 }
@@ -182,7 +202,223 @@ const solarPreset: PresetDef = {
   },
 };
 
-export const PRESETS: PresetDef[] = [supernovaPreset, knotPreset, solarPreset];
+/* ══════════ DNA helix ══════════ */
+
+const dnaPreset: PresetDef = {
+  id: 'dna',
+  label: 'DNA helix',
+  hint: 'A double helix with rungs, turning a notch at a time. The stop-motion is the point: at any continuous rate the springs never catch the strands and it fills in as a plain cylinder.',
+  // Hot enough that a strand lands well inside the frame it is held for.
+  simSpeed: 2.2,
+  start(scene) {
+    scene.setFormationOffset(0, 0);
+    // Two thin strands and a ladder: sparse, or they overlap into one bar.
+    scene.setFormationParticipation(0.22);
+    scene.setTargetDrawer(dnaDrawer());
+    scene.setTextFormation(true);
+    return {
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Hourglass ══════════ */
+
+const hourglassPreset: PresetDef = {
+  id: 'hourglass',
+  label: 'Hourglass',
+  hint: 'The field pours through a neck, piles up, and the glass turns over. No sand physics anywhere — the particles walk down through the stream because of the order the targets are dealt in.',
+  start(scene) {
+    let t = 0;
+    let phase = -1;
+    scene.setFormationOffset(0, 0);
+    // Sand is a solid and has to read as one, so this is a high membership by
+    // the standards of this file — but the pile is the densest thing any of
+    // these presets draws, so the bloom is pinned hard to go with it.
+    scene.setFormationParticipation(0.5);
+    scene.setPresetBloom(0.14);
+    scene.setTargetDrawer(hourglassDrawer());
+    scene.setTextFormation(true);
+    return {
+      update(s, dt) {
+        t += dt;
+        // Flush the trails across each flip: for a second and a bit every
+        // particle's rank means something different and the whole mass tumbles
+        // at once, which smears white if the afterimage is left alone.
+        const flipping = t % HOURGLASS_CYCLE >= HOURGLASS_POUR;
+        const id = Math.floor(t / HOURGLASS_CYCLE) * 2 + (flipping ? 1 : 0);
+        if (id !== phase) {
+          phase = id;
+          if (flipping) s.kickTrails(0.4, 1500);
+        }
+      },
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+        s.setPresetBloom(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Fireworks ══════════ */
+
+const fireworksPreset: PresetDef = {
+  id: 'fireworks',
+  label: 'Fireworks',
+  hint: 'Shells climb the stage one after another, arc, and burst — each one taking the field up with it and throwing it back out. Every bang is a real shockwave, fired where the shell opened.',
+  start(scene) {
+    let t = 0;
+    let loopStart = 0;
+    let next = 0;
+    scene.setFormationOffset(0, 0);
+    scene.setFormationParticipation(0.26);
+    scene.setPresetBloom(0.45);
+    scene.setTargetDrawer(fireworksDrawer());
+    scene.setTextFormation(true);
+    return {
+      update(s, dt) {
+        t += dt;
+        // Bursts are listed in launch order, so one cursor walks the list and
+        // resets with the loop. Kept well under the ~0.08 that would release
+        // the formation hold outright: the shockwave is there to throw the
+        // petals apart, not to hand the whole membership back mid-display.
+        while (next < FIREWORKS_BURSTS.length && t >= loopStart + FIREWORKS_BURSTS[next].at) {
+          const b = FIREWORKS_BURSTS[next++];
+          s.shockwave(0.05, b.x, b.y);
+        }
+        if (t >= loopStart + FIREWORKS_LOOP) {
+          loopStart += FIREWORKS_LOOP;
+          next = 0;
+        }
+      },
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+        s.setPresetBloom(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Clock ══════════ */
+
+const clockPreset: PresetDef = {
+  id: 'clock',
+  label: 'Clock',
+  hint: 'A working analog clock: the field is telling you the actual time. Nothing moves between ticks, so the particles settle completely and the dial holds crisp.',
+  start(scene) {
+    scene.setFormationOffset(0, 0);
+    scene.setFormationParticipation(0.3);
+    scene.setTargetDrawer(clockDrawer());
+    scene.setTextFormation(true);
+    return {
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Heartbeat ══════════ */
+
+const heartbeatPreset: PresetDef = {
+  id: 'heartbeat',
+  label: 'Heartbeat',
+  hint: 'An EKG trace with a bolus of light running along it, and a shockwave fired on every QRS spike. The lag behind the sweep is the phosphor tail.',
+  start(scene) {
+    let t = 0;
+    let beat = -1;
+    scene.setFormationOffset(0, 0);
+    // A single thin line: the sparsest membership here, or the trace lights up
+    // as one solid bar and the spikes vanish inside it.
+    scene.setFormationParticipation(0.16);
+    scene.setPresetBloom(0.16);
+    scene.setTargetDrawer(ekgDrawer());
+    scene.setTextFormation(true);
+    return {
+      update(s, dt) {
+        t += dt;
+        const i = Math.floor(t / EKG_BEAT);
+        if (i !== beat && (t % EKG_BEAT) / EKG_BEAT >= EKG_R_PHASE) {
+          beat = i;
+          const at = ekgSpikeAt(i);
+          s.shockwave(0.06, at.x, at.y);
+        }
+      },
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+        s.setPresetBloom(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Möbius strip ══════════ */
+
+const mobiusPreset: PresetDef = {
+  id: 'mobius',
+  label: 'Möbius',
+  hint: 'A strip turning through its own twist, a notch at a time. Follow the edge and it goes round twice before it closes — there is no second side to find.',
+  simSpeed: 2.2,
+  start(scene) {
+    scene.setFormationOffset(0, 0);
+    // Ribs and one edge: line-work, so the same sparse membership the knot uses.
+    scene.setFormationParticipation(0.2);
+    scene.setTargetDrawer(mobiusDrawer());
+    scene.setTextFormation(true);
+    return {
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+      },
+    };
+  },
+};
+
+/* ══════════ Ocean ══════════ */
+
+const oceanPreset: PresetDef = {
+  id: 'ocean',
+  label: 'Ocean',
+  hint: 'A sine swell seen at a low angle, crests steepening and breaking into foam. Broad and thin, so it is the one scene here that takes most of the field without blooming out.',
+  start(scene) {
+    scene.setFormationOffset(0, 0);
+    // The exception to every other participation number in this file: the
+    // shape is a dozen long profile lines, so there is room for the field.
+    scene.setFormationParticipation(0.42);
+    // Even so, the water never settles (every row moves every frame), and a
+    // line that never settles is a line the trail pass keeps re-adding.
+    scene.setPresetBloom(0.1);
+    scene.setTargetDrawer(oceanDrawer());
+    scene.setTextFormation(true);
+    return {
+      stop(s) {
+        s.setTextFormation(false);
+        s.setTargetDrawer(null);
+        s.setPresetBloom(null);
+      },
+    };
+  },
+};
+
+export const PRESETS: PresetDef[] = [
+  supernovaPreset,
+  knotPreset,
+  solarPreset,
+  dnaPreset,
+  hourglassPreset,
+  fireworksPreset,
+  clockPreset,
+  heartbeatPreset,
+  mobiusPreset,
+  oceanPreset,
+];
 
 export function findPreset(id: string | null): PresetDef | null {
   return PRESETS.find((p) => p.id === id) ?? null;

@@ -16,8 +16,8 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform float uSpeedGlow;
 uniform float uLineStrength;
-uniform float uAttractor;
-uniform float uHole;
+uniform float uFlow;       // strength of whichever mode is flying the field
+//                            along smooth coherent paths (modes.ts `flow`)
 uniform float uFormationGlow; // 1 normally; dips while a formation is held so
 //                               dense shapes show palette color, not bloom-white
 
@@ -40,10 +40,11 @@ void main() {
   vec3 colB = gradientColor(uPaletteB[0], uPaletteB[1], uPaletteB[2], uPaletteB[3], uPaletteB[4], uFxB, uNormalB);
   vec3 col = mix(colA, colB, uBlend);
 
-  // The two modes that concentrate the field: the attractor onto its manifold,
-  // the black hole into its disc. Both pack the population into a fraction of
-  // the volume chaos spreads it over.
-  float dense = max(uAttractor, uHole);
+  // The modes that fly the field along coherent paths — onto the attractor's
+  // manifold, into the hole's disc, round the galaxy's arms, up an aurora
+  // curtain. All of them pack the population into a fraction of the volume
+  // chaos spreads it over, and along lines the trail pass keeps re-adding.
+  float dense = uFlow;
 
   // Velocity glow: fast particles brighten (capped harder in line mode —
   // chains assembling at speed otherwise storm into a whiteout)
