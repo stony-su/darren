@@ -12,6 +12,49 @@ varying vec2 vLookup;
 varying float vSpeed;
 varying float vViewZ;
 
+/* A step smaller than this is float32 quantization noise, not motion: world
+   coordinates run past 6 out at the edges of the field, where one ULP is
+   ~5e-7. Steps are bimodal in practice — parked particles sit at 0..1e-7,
+   moving ones at 1e-4 and up — so this band is empty and nothing flickers
+   across it. */
+const float REST_STEP = 2e-6;
+const float MOVE_STEP = 2e-5;
+
+/** Stable per-particle axis, uniform over the sphere. */
+vec3 parkedAxis( vec2 seed, float salt ) {
+  float a = fract( sin( dot( seed, vec2( 127.1, 311.7 ) ) + salt ) * 43758.5453 ) * 6.2831853;
+  float pz = fract( sin( dot( seed, vec2( 269.5, 183.3 ) ) + salt ) * 43758.5453 ) * 2.0 - 1.0;
+  float r = sqrt( max( 0.0, 1.0 - pz * pz ) );
+  return vec3( cos( a ) * r, sin( a ) * r, pz );
+}
+
+/* Resting axis for the *shading* normal. Spread around +Z rather than over
+   the whole sphere: +Z is the resting hue the field has always had, so a
+   settled formation still reads in the theme's colour — a live speckle
+   around it instead of full-spectrum confetti, which buries the letterforms. */
+const float PARKED_SPREAD = 0.45;
+
+vec3 parkedShadingAxis( vec2 seed ) {
+  vec3 biased = mix( vec3( 0.0, 0.0, 1.0 ), parkedAxis( seed, 0.0 ), PARKED_SPREAD );
+  float bl = length( biased );
+  return bl > 1e-4 ? biased / bl : vec3( 0.0, 0.0, 1.0 );
+}
+
+/* Unit direction of a step, fading to a parked axis as the step decays into
+   noise. Normalizing a noise-sized step reseeds a random direction every
+   frame, and a step of exactly zero has no direction at all — so a settled
+   formation would otherwise strobe between confetti and whatever constant
+   the guard fell back to (identical for every particle). Both are visible:
+   the feather's only vertex normal is +Z, so the frame's z axis IS the
+   shading normal, and normal-shaded themes read it straight out as color. */
+vec3 stepDir( vec3 delta, vec3 parked ) {
+  float len = length( delta );
+  vec3 blended = mix( parked, delta / max( len, REST_STEP ),
+                      smoothstep( REST_STEP, MOVE_STEP, len ) );
+  float bl = length( blended );
+  return bl > 1e-4 ? blended / bl : parked;   // guard the antipodal midpoint
+}
+
 void main(){
 
   vLookup = lookup;
@@ -21,20 +64,23 @@ void main(){
   vec3 ioPos  = texture2D( t_oPos  , lookup ).xyz;
   vec3 iooPos = texture2D( t_ooPos , lookup ).xyz;
 
-  // velocity-based rotation matrix (guarded against zero-length deltas so
-  // near-still particles — e.g. holding a text formation — never go NaN)
+  // velocity-based rotation matrix. Particles that have come to rest — e.g.
+  // holding a text formation — have no direction of travel to build it from,
+  // so they hold a stable per-particle axis instead of NaN, noise, or one
+  // shared constant.
   vec3 d1 = iPos  - ioPos;
   vec3 d2 = ioPos - iooPos;
 
   vSpeed = length( d1 );
 
-  vec3 z = vSpeed > 1e-8 ? normalize( d1 ) : vec3( 0.0, 0.0, 1.0 );
-  vec3 xr = cross( z , normalize( d2 + vec3( 1e-7 ) ) );
+  vec3 z = stepDir( d1, parkedShadingAxis( lookup ) );
+  vec3 xr = cross( z , stepDir( d2, parkedAxis( lookup, 7.13 ) ) );
   // In filament-line mode, near-straight motion makes this cross product
   // degenerate and normalizing it amplifies float noise into per-particle
   // random orientations (confetti normals along the lines) — so lines use a
-  // stable reference frame. Chaos mode keeps the noisy axes: their shimmer
-  // is what makes dense formations (DARREN) glow white-hot.
+  // stable reference frame. Chaos mode keeps the noisy roll: its shimmer is
+  // what makes dense formations (DARREN) glow white-hot while they gather.
+  // (Parked particles are already stable — both axes come from stepDir.)
   float axisThresh = mix( 1e-8, 1e-3, uLineStrength );
   vec3 ref = abs( z.y ) < 0.95 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 );
   vec3 x = length( xr ) > axisThresh ? normalize( xr ) : normalize( cross( z, ref ) );

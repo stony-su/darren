@@ -12,14 +12,17 @@ export interface PlaygroundSettings {
   count: number | null;         // particle count; null = auto device tier
 }
 
+/* These are the scene's starting values too — ParticleScene seeds its uniforms
+   from here, and PlaygroundPanel.applyAll() only pushes a setting that differs
+   from its default, so the two must not drift apart. */
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
   speed: 1,
-  noiseSize: 1.5,
+  noiseSize: 0.5,
   mouseMode: 'auto',
   mouseStrength: 1,
   lineMode: 'auto',
   trailOverride: null,
-  bloomMult: 1,
+  bloomMult: 0.15,
   count: null,
 };
 
