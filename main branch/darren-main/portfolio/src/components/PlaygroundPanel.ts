@@ -1,6 +1,7 @@
 import { ParticleScene } from '../animation/scene';
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from '../animation/settings';
 import type { PlaygroundSettings, MouseMode, LineMode } from '../animation/settings';
+import { setPanelOpen, onPanelOpened } from './panelBus';
 
 const MOUSE_MODES: MouseMode[] = ['auto', 'attract', 'repel', 'off'];
 
@@ -72,24 +73,32 @@ export class PlaygroundPanel {
       { signal: this.ac.signal }
     );
 
+    onPanelOpened('playground', () => this.setOpen(false), this.ac.signal);
+
     this.bind();
     this.applyAll();
   }
 
   destroy(): void {
+    this.setOpen(false);
     this.ac.abort();
     this.gear?.remove();
     this.gear = null;
     this.panel?.remove();
     this.panel = null;
-    this.open = false;
   }
 
   private toggle(): void {
-    this.open = !this.open;
-    this.panel?.classList.toggle('open', this.open);
-    this.gear?.classList.toggle('open', this.open);
-    this.gear?.setAttribute('aria-expanded', String(this.open));
+    this.setOpen(!this.open);
+  }
+
+  private setOpen(open: boolean): void {
+    if (open === this.open) return;
+    this.open = open;
+    this.panel?.classList.toggle('open', open);
+    this.gear?.classList.toggle('open', open);
+    this.gear?.setAttribute('aria-expanded', String(open));
+    setPanelOpen('playground', open);
   }
 
   private render(): string {

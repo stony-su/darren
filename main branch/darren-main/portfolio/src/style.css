@@ -25,17 +25,14 @@ body {
   display: none;
 }
 
-/* ── Intro Line Animations ── */
+/* ── Intro: curved per-letter text ── */
 
-.intro-line {
-  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              filter 0.6s ease;
-  will-change: opacity, transform, filter;
+.arc-line {
+  /* The static per-slide offset lives in the inline transform; the letters
+     animate individually, so the wrapper itself never transitions. */
+  will-change: transform;
 }
 
-/* Curved intro text: sentences ride an SVG arc pinned to the top or bottom
-   band, leaving the center stage to the particle choreography. */
 .intro-curve {
   display: block;
   margin: 0 auto;
@@ -44,78 +41,55 @@ body {
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
-.intro-curve text {
-  letter-spacing: 0.04em;
-}
-
-/* Sticker pop-in base */
-.sticker {
+/* Per-letter telekinetic assemble / scatter. The parent <g> handles arc
+   placement; the inner <text> animates in its own local space, so letters
+   fly in along the direction they sit on the curve. */
+.intro-glyph text {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transform: translateY(30px) scale(0.55);
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.5s ease;
   will-change: transform, opacity;
+  letter-spacing: 0.01em;
+}
+.arc-line.is-active .intro-glyph text {
+  opacity: 1;
+  transform: none;
+}
+.arc-line.is-exit .intro-glyph text {
+  opacity: 0;
+  transform: translateY(-26px) scale(0.8);
 }
 
-.sticker img {
-  transition: box-shadow 0.3s ease;
+/* ── Intro: persistent image frames (telekinetic flight) ──
+   One shared pool of frames drifts from one slide's layout to the next and
+   cross-fades its photo mid-flight, instead of popping in and out. */
+.intro-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 3px solid var(--accent-border);
+  box-shadow: var(--glow-shadow);
+  opacity: 0;
+  transition: transform 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              width 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.55s ease,
+              border-color 0.6s ease,
+              box-shadow 0.6s ease;
+  will-change: transform, width, height, opacity;
 }
-
-/* Rise up */
-.intro-line-rise {
-  transform: translateY(30px);
-}
-.intro-line-rise.intro-line-active {
-  transform: translateY(0);
-}
-.intro-line-rise.intro-line-exit {
-  transform: translateY(-20px);
-}
-
-/* Letter spacing expand */
-.intro-line-letter {
-  letter-spacing: -0.02em;
-  transform: scale(0.96);
-}
-.intro-line-letter.intro-line-active {
-  letter-spacing: 0.15em;
-  transform: scale(1);
-}
-.intro-line-letter.intro-line-exit {
-  letter-spacing: 0.3em;
-  opacity: 0 !important;
-}
-
-/* Scale in */
-.intro-line-scale {
-  transform: scale(0.85);
-}
-.intro-line-scale.intro-line-active {
-  transform: scale(1);
-}
-.intro-line-scale.intro-line-exit {
-  transform: scale(1.05);
-}
-
-/* Slide from right */
-.intro-line-slide {
-  transform: translateX(60px);
-}
-.intro-line-slide.intro-line-active {
-  transform: translateX(0);
-}
-.intro-line-slide.intro-line-exit {
-  transform: translateX(-60px);
-}
-
-/* Blur unblur */
-.intro-line-blur {
-  filter: blur(12px);
-  transform: scale(1.05);
-}
-.intro-line-blur.intro-line-active {
-  filter: blur(0px);
-  transform: scale(1);
-}
-.intro-line-blur.intro-line-exit {
-  filter: blur(8px);
-  transform: scale(0.97);
+.intro-frame-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.6s ease;
 }
 
 /* ── Project Card: pointer tilt + lift ── */
@@ -739,7 +713,8 @@ body {
   .pg-panel .pg-head,
   .pg-panel .pg-sub,
   .pg-panel .pg-section,
-  .pg-panel .pg-footer {
+  .pg-panel .pg-footer,
+  .md-opt {
     transition-duration: 0.01s;
     transition-delay: 0s;
   }
@@ -750,9 +725,24 @@ body {
   cursor: pointer;
   transition:
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    right 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.3s ease,
     border-color 0.3s ease,
     background 0.3s ease;
+}
+
+/* An open sheet would otherwise sit on top of both toggles, so they ride out
+   in front of it — that's what lets you hop straight from one panel to the
+   other. Only above the width where the sheet stops being 88vw; below it,
+   there is nowhere left to ride out to. */
+@media (min-width: 420px) {
+  .panel-open .pg-gear {
+    right: calc(1.5rem + 340px);
+  }
+
+  .panel-open .md-orb {
+    right: calc(5rem + 340px);
+  }
 }
 
 .pg-gear:hover,
@@ -972,6 +962,100 @@ body {
 
 .pg-select option {
   background: #14141f;
+}
+
+/* ── Modes sidebar (shares the playground panel's chrome) ── */
+.md-orb {
+  /* One slot left of the gear: 1.5rem edge + 2.75rem button + 0.75rem gap */
+  right: 5rem;
+}
+
+.md-orb.open {
+  /* Beats .pg-gear.open's rotate — a gear turns, a star swells */
+  transform: scale(1.12);
+}
+
+.md-note {
+  margin: -6px 0 14px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.md-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 11px 13px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.15s ease;
+}
+
+.md-opt:last-child {
+  margin-bottom: 0;
+}
+
+.md-opt:hover,
+.md-opt:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent-border);
+}
+
+.md-opt:active {
+  transform: scale(0.985);
+}
+
+.md-opt[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--accent-border);
+  box-shadow: var(--glow-shadow);
+}
+
+.md-opt-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.md-opt[aria-pressed='true'] .md-opt-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.md-opt-text {
+  display: block;
+}
+
+.md-opt-name {
+  display: block;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.md-opt[aria-pressed='true'] .md-opt-name {
+  color: var(--accent);
+}
+
+.md-opt-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* ── Subtle grain overlay for depth ── */

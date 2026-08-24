@@ -189,7 +189,13 @@ export class ProjectSlideshow {
     });
 
     this.scene.setTheme(this.themeForSlide(index));
-    this.scene.setAttract(isEdge);
+    // Project slides always use their theme's bloom (the intro's last line
+    // zeroes it, and that must not carry over).
+    this.scene.setBloomOverride(null);
+    // Title/Contact used to auto-attract, which collapsed the whole field into
+    // a tight knot at the attract point (screen centre until the mouse moves).
+    // Gathering is opt-in now — the playground's Gather preset.
+    this.scene.setAttract(false);
     // Project-card slides gather the field into curl filament lines
     this.scene.setLineMode(!isEdge);
     const wind = isEdge ? [0, 0, 0] : WIND_TABLE[(index - 1) % WIND_TABLE.length];
@@ -211,6 +217,10 @@ export class ProjectSlideshow {
   private updateCardRect(): void {
     const slides = this.slideshowEl.querySelectorAll('.slide');
     const slide = slides[this.currentIndex];
+    // Only the project cards deflect. Title/Contact are centred copy, and a
+    // deflection box around that sits on the middle of the stage — it reads as
+    // the field being blown outward from the centre of the screen rather than
+    // as flow around anything. Those two slides run the field unaltered.
     const card = slide?.querySelector('.project-card');
     this.scene.setCardRect(card ? card.getBoundingClientRect() : null);
   }
@@ -413,7 +423,7 @@ export class ProjectSlideshow {
     slide.className = 'slide snap-center shrink-0 w-screen h-dvh flex items-center justify-center';
 
     slide.innerHTML = `
-      <div class="text-center px-8 max-w-3xl">
+      <div class="slide-copy text-center px-8 max-w-3xl">
         <h2 class="font-display italic text-6xl md:text-8xl text-slate-100 mb-6 slide-title-enter">
           Selected Work
         </h2>
@@ -505,6 +515,7 @@ export class ProjectSlideshow {
         </div>
       `;
     }
+
     const previewBtn = project.embed && project.liveUrl
       ? `
         <button type="button" class="live-preview-btn font-body"
@@ -680,7 +691,7 @@ export class ProjectSlideshow {
     slide.className = 'slide snap-center shrink-0 w-screen h-dvh flex items-center justify-center';
 
     slide.innerHTML = `
-      <div class="text-center px-8 max-w-2xl">
+      <div class="slide-copy text-center px-8 max-w-2xl">
         <h2 class="font-display italic text-5xl md:text-7xl text-slate-100 mb-6">
           Let's Talk
         </h2>

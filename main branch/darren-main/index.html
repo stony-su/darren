@@ -1,0 +1,1785 @@
+<html>
+
+  <head>
+    <style>
+      body{ margin: 0px; }
+      html{ overflow: hidden }
+      
+      #colorToggle {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        z-index: 1000;
+        letter-spacing: 0.3px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      #colorToggle:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+      #colorToggle:active {
+        transform: translateY(0);
+      }
+      #colorToggle.normal {
+        background: rgba(255,255,255,0.1);
+        color: rgba(255,255,255,0.9);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      }
+      #colorToggle.neon {
+        background: rgba(255,0,100,0.2);
+        color: #ff6b9d;
+        border-color: rgba(255,100,150,0.3);
+        box-shadow: 0 2px 12px rgba(255,0,100,0.2);
+      }
+      #colorToggle.matcha {
+        background: rgba(100,150,100,0.2);
+        color: #8fbc8f;
+        border-color: rgba(140,180,140,0.3);
+        box-shadow: 0 2px 12px rgba(100,150,100,0.2);
+      }
+      #colorToggle.beach {
+        background: rgba(30,60,100,0.3);
+        color: #87ceeb;
+        border-color: rgba(100,150,200,0.3);
+        box-shadow: 0 2px 12px rgba(30,80,150,0.2);
+      }
+      #colorToggle.blizzard {
+        background: rgba(255,255,255,0.2);
+        color: #ffffff;
+        border-color: rgba(255,255,255,0.4);
+        box-shadow: 0 2px 12px rgba(255,255,255,0.25);
+      }
+      
+      .theme-indicator {
+        position: fixed;
+        top: 60px;
+        right: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 10px;
+        color: rgba(255,255,255,0.4);
+        letter-spacing: 0.5px;
+        z-index: 1000;
+      }
+      
+      /* Center Title and Time Display */
+      .center-display {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+        z-index: 100;
+        transition: all 0.4s ease;
+      }
+      .center-title {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 300;
+        letter-spacing: 8px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        opacity: 0.6;
+        transition: all 0.4s ease;
+      }
+      .center-time {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 72px;
+        font-weight: 200;
+        letter-spacing: 4px;
+        line-height: 1;
+        transition: all 0.4s ease;
+      }
+      .center-date {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 400;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-top: 12px;
+        opacity: 0.5;
+        transition: all 0.4s ease;
+      }
+      
+      /* Theme-specific styles for center display */
+      .center-display.normal .center-title { color: rgba(200, 210, 255, 0.6); }
+      .center-display.normal .center-time { color: rgba(255, 255, 255, 0.85); text-shadow: 0 0 40px rgba(100, 120, 255, 0.3); }
+      .center-display.normal .center-date { color: rgba(180, 190, 220, 0.5); }
+      
+      .center-display.neon .center-title { color: rgba(255, 100, 150, 0.7); }
+      .center-display.neon .center-time { color: rgba(255, 50, 120, 0.95); text-shadow: 0 0 60px rgba(255, 0, 100, 0.5), 0 0 120px rgba(255, 0, 100, 0.3); }
+      .center-display.neon .center-date { color: rgba(255, 150, 180, 0.5); }
+      
+      .center-display.matcha .center-title { color: rgba(140, 190, 140, 0.6); }
+      .center-display.matcha .center-time { color: rgba(180, 220, 180, 0.9); text-shadow: 0 0 50px rgba(100, 180, 100, 0.4); }
+      .center-display.matcha .center-date { color: rgba(140, 180, 140, 0.5); }
+      
+      .center-display.beach .center-title { color: rgba(135, 180, 220, 0.6); }
+      .center-display.beach .center-time { color: rgba(135, 206, 235, 0.9); text-shadow: 0 0 50px rgba(30, 144, 255, 0.4), 0 0 100px rgba(255, 200, 100, 0.2); }
+      .center-display.beach .center-date { color: rgba(180, 200, 220, 0.5); }
+      
+      .center-display.blizzard .center-title { color: rgba(255, 255, 255, 0.6); }
+      .center-display.blizzard .center-time { color: rgba(255, 255, 255, 0.98); text-shadow: 0 0 40px rgba(255, 255, 255, 0.8), 0 0 80px rgba(220, 240, 255, 0.6), 0 0 150px rgba(255, 255, 255, 0.4); }
+      .center-display.blizzard .center-date { color: rgba(255, 255, 255, 0.5); }
+      
+      #resetIndicator {
+        position: fixed;
+        top: calc(50% + 140px);
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        pointer-events: none;
+        z-index: 999;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      #resetIndicator.active {
+        opacity: 1;
+      }
+      #resetIndicator svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      #resetIndicator .bg-circle {
+        fill: none;
+        stroke: rgba(255,255,255,0.1);
+        stroke-width: 3;
+      }
+      #resetIndicator .progress-circle {
+        fill: none;
+        stroke: rgba(255,255,255,0.8);
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-dasharray: 226;
+        stroke-dashoffset: 226;
+        transition: stroke 0.2s ease;
+      }
+      #resetIndicator.complete .progress-circle {
+        stroke: rgba(100,255,150,0.9);
+      }
+      
+      /* Mouse Laser Trail */
+      .laser-trail {
+        position: fixed;
+        pointer-events: none;
+        z-index: 50;
+        border-radius: 2px;
+        transform-origin: 0 50%;
+      }
+      
+      .laser-trail.normal {
+        background: linear-gradient(90deg, rgba(100, 120, 255, 0.9), rgba(150, 100, 255, 0.6));
+        box-shadow: 0 0 8px rgba(100, 120, 255, 0.8), 0 0 16px rgba(100, 120, 255, 0.4), 0 0 24px rgba(150, 100, 255, 0.3);
+      }
+      
+      .laser-trail.neon {
+        background: linear-gradient(90deg, rgba(255, 0, 100, 0.95), rgba(255, 50, 150, 0.7));
+        box-shadow: 0 0 10px rgba(255, 0, 100, 0.9), 0 0 20px rgba(255, 0, 100, 0.6), 0 0 40px rgba(255, 50, 150, 0.4);
+      }
+      
+      .laser-trail.matcha {
+        background: linear-gradient(90deg, rgba(100, 200, 100, 0.9), rgba(150, 220, 100, 0.6));
+        box-shadow: 0 0 8px rgba(100, 200, 100, 0.8), 0 0 16px rgba(100, 200, 100, 0.4), 0 0 24px rgba(150, 220, 100, 0.3);
+      }
+      
+      .laser-trail.beach {
+        background: linear-gradient(90deg, rgba(30, 144, 255, 0.9), rgba(255, 180, 100, 0.6));
+        box-shadow: 0 0 10px rgba(30, 144, 255, 0.8), 0 0 20px rgba(30, 144, 255, 0.5), 0 0 30px rgba(255, 180, 100, 0.3);
+      }
+      
+      .laser-trail.blizzard {
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(200, 230, 255, 0.7));
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 24px rgba(220, 240, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.4);
+      }
+      
+      /* Helix Particles */
+      .helix-particle {
+        position: fixed;
+        pointer-events: none;
+        z-index: 51;
+        border-radius: 50%;
+        transition: opacity 0.1s ease;
+      }
+      
+      .helix-particle.normal {
+        background: radial-gradient(circle, rgba(150, 130, 255, 1) 0%, rgba(100, 120, 255, 0.8) 50%, transparent 100%);
+        box-shadow: 0 0 6px rgba(130, 120, 255, 0.9), 0 0 12px rgba(100, 100, 255, 0.5);
+      }
+      
+      .helix-particle.neon {
+        background: radial-gradient(circle, rgba(255, 100, 180, 1) 0%, rgba(255, 0, 100, 0.8) 50%, transparent 100%);
+        box-shadow: 0 0 8px rgba(255, 0, 100, 1), 0 0 16px rgba(255, 50, 150, 0.7), 0 0 24px rgba(255, 0, 100, 0.4);
+      }
+      
+      .helix-particle.matcha {
+        background: radial-gradient(circle, rgba(150, 255, 150, 1) 0%, rgba(100, 200, 100, 0.8) 50%, transparent 100%);
+        box-shadow: 0 0 6px rgba(100, 220, 100, 0.9), 0 0 12px rgba(80, 180, 80, 0.5);
+      }
+      
+      .helix-particle.beach {
+        background: radial-gradient(circle, rgba(100, 200, 255, 1) 0%, rgba(255, 200, 120, 0.8) 50%, transparent 100%);
+        box-shadow: 0 0 8px rgba(30, 144, 255, 0.9), 0 0 14px rgba(255, 180, 100, 0.6);
+      }
+      
+      .helix-particle.blizzard {
+        background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(220, 240, 255, 0.9) 50%, transparent 100%);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(220, 240, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.5);
+      }
+      
+      /* Music Player Widget */
+      .music-player {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 100;
+        transition: all 0.4s ease;
+        padding: 16px 24px;
+        min-width: 380px;
+      }
+      
+      .audio-visualizer {
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        height: 28px;
+        gap: 2px;
+        margin-bottom: 12px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .audio-visualizer.active {
+        opacity: 1;
+      }
+      
+      .audio-bar {
+        width: 3px;
+        min-height: 2px;
+        border-radius: 2px;
+        transition: height 0.05s ease, background 0.3s ease;
+      }
+      
+      .audio-visualizer.normal .audio-bar {
+        background: linear-gradient(to top, rgba(100, 120, 255, 0.6), rgba(150, 100, 255, 0.9));
+        box-shadow: 0 0 8px rgba(100, 120, 255, 0.5);
+      }
+      
+      .audio-visualizer.neon .audio-bar {
+        background: linear-gradient(to top, rgba(255, 0, 100, 0.6), rgba(255, 100, 180, 0.95));
+        box-shadow: 0 0 10px rgba(255, 0, 100, 0.7);
+      }
+      
+      .audio-visualizer.matcha .audio-bar {
+        background: linear-gradient(to top, rgba(80, 160, 80, 0.6), rgba(150, 220, 100, 0.9));
+        box-shadow: 0 0 8px rgba(100, 200, 100, 0.5);
+      }
+      
+      .audio-visualizer.beach .audio-bar {
+        background: linear-gradient(to top, rgba(30, 144, 255, 0.6), rgba(255, 200, 100, 0.9));
+        box-shadow: 0 0 8px rgba(30, 144, 255, 0.5);
+      }
+      
+      .audio-visualizer.blizzard .audio-bar {
+        background: linear-gradient(to top, rgba(200, 220, 255, 0.7), rgba(255, 255, 255, 1));
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+      }
+      
+      .song-title {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        margin-bottom: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 340px;
+        margin-left: auto;
+        margin-right: auto;
+        transition: color 0.4s ease;
+      }
+      
+      .player-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      
+      .player-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.8);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        padding: 0;
+      }
+      
+      .player-btn:hover {
+        background: rgba(255,255,255,0.15);
+        transform: scale(1.08);
+      }
+      
+      .player-btn.active {
+        background: rgba(100, 150, 255, 0.3);
+        color: rgba(150, 180, 255, 1);
+      }
+      
+      .player-btn.play-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+        background: rgba(255,255,255,0.12);
+      }
+      
+      .player-btn.play-btn:hover {
+        background: rgba(255,255,255,0.2);
+      }
+      
+      .player-btn svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
+      }
+      
+      .player-btn.play-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+      
+      .volume-control {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 8px;
+        padding-left: 8px;
+        border-left: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      .player-divider {
+        width: 1px;
+        height: 24px;
+        background: rgba(255,255,255,0.1);
+        margin: 0 4px;
+      }
+      
+      /* Theme-specific song title colors */
+      .music-player.normal .song-title { color: rgba(200, 210, 255, 0.9); }
+      .music-player.neon .song-title { color: rgba(255, 100, 150, 0.95); text-shadow: 0 0 20px rgba(255, 0, 100, 0.4); }
+      .music-player.matcha .song-title { color: rgba(180, 220, 180, 0.9); }
+      .music-player.beach .song-title { color: rgba(135, 206, 235, 0.95); text-shadow: 0 0 15px rgba(30, 144, 255, 0.3); }
+      .music-player.blizzard .song-title { color: rgba(255, 255, 255, 0.98); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); }
+      
+      /* Theme-specific active button colors */
+      .music-player.neon .player-btn.active { background: rgba(255, 0, 100, 0.3); color: rgba(255, 100, 150, 1); }
+      .music-player.matcha .player-btn.active { background: rgba(100, 180, 100, 0.3); color: rgba(150, 220, 150, 1); }
+      .music-player.beach .player-btn.active { background: rgba(30, 144, 255, 0.3); color: rgba(100, 180, 255, 1); }
+      .music-player.blizzard .player-btn.active { background: rgba(255, 255, 255, 0.25); color: rgba(255, 255, 255, 1); }
+      
+      /* Mouse Mode Toggle */
+      .mouse-mode-toggle {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        padding: 10px 16px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        letter-spacing: 0.3px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .mouse-mode-toggle:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+      
+      .mouse-mode-toggle.off {
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.5);
+      }
+      
+      .mouse-mode-toggle.attract {
+        background: rgba(100, 200, 255, 0.2);
+        color: rgba(100, 200, 255, 0.9);
+        border-color: rgba(100, 200, 255, 0.3);
+        box-shadow: 0 2px 12px rgba(100, 200, 255, 0.2);
+      }
+      
+      .mouse-mode-toggle.repel {
+        background: rgba(255, 100, 100, 0.2);
+        color: rgba(255, 100, 100, 0.9);
+        border-color: rgba(255, 100, 100, 0.3);
+        box-shadow: 0 2px 12px rgba(255, 100, 100, 0.2);
+      }
+      
+      .mouse-mode-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        position: relative;
+        transition: all 0.3s ease;
+      }
+      
+      .mouse-mode-toggle.off .mouse-mode-icon {
+        border: 2px solid rgba(255,255,255,0.3);
+      }
+      
+      .mouse-mode-toggle.attract .mouse-mode-icon {
+        border: 2px solid rgba(100, 200, 255, 0.8);
+        box-shadow: inset 0 0 8px rgba(100, 200, 255, 0.6);
+      }
+      
+      .mouse-mode-toggle.attract .mouse-mode-icon::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 4px;
+        height: 4px;
+        background: rgba(100, 200, 255, 0.9);
+        border-radius: 50%;
+        box-shadow: 0 0 6px rgba(100, 200, 255, 0.8);
+      }
+      
+      .mouse-mode-toggle.repel .mouse-mode-icon {
+        border: 2px solid rgba(255, 100, 100, 0.8);
+      }
+      
+      .mouse-mode-toggle.repel .mouse-mode-icon::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 100, 100, 0.6);
+        border-radius: 50%;
+        animation: repelPulse 1s ease-out infinite;
+      }
+      
+      @keyframes repelPulse {
+        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+      }
+      
+      .mouse-mode-hint {
+        position: fixed;
+        top: 62px;
+        left: 25px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+        letter-spacing: 0.5px;
+        z-index: 1000;
+      }
+      
+      /* Settings Panel */
+      .settings-toggle {
+        position: fixed;
+        top: 20px;
+        right: 237px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        font-size: 18px;
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1001;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        background: rgba(255,255,255,0.1);
+        color: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .settings-toggle:hover {
+        background: rgba(255,255,255,0.15);
+        transform: rotate(30deg);
+      }
+      
+      .settings-toggle.active {
+        background: rgba(100,150,255,0.2);
+        border-color: rgba(100,150,255,0.4);
+        color: rgba(150,180,255,0.95);
+      }
+      
+      /* Theme-specific settings toggle button */
+      .settings-toggle.neon {
+        border-color: rgba(255,100,150,0.3);
+        color: rgba(255,100,150,0.8);
+      }
+      .settings-toggle.neon:hover {
+        background: rgba(255,0,100,0.15);
+      }
+      .settings-toggle.neon.active {
+        background: rgba(255,0,100,0.2);
+        border-color: rgba(255,0,100,0.4);
+        color: rgba(255,100,150,0.95);
+      }
+      
+      .settings-toggle.matcha {
+        border-color: rgba(140,180,140,0.3);
+        color: rgba(150,200,150,0.8);
+      }
+      .settings-toggle.matcha:hover {
+        background: rgba(100,180,100,0.15);
+      }
+      .settings-toggle.matcha.active {
+        background: rgba(100,180,100,0.2);
+        border-color: rgba(100,180,100,0.4);
+        color: rgba(150,220,150,0.95);
+      }
+      
+      .settings-toggle.beach {
+        border-color: rgba(100,150,200,0.3);
+        color: rgba(100,180,255,0.8);
+      }
+      .settings-toggle.beach:hover {
+        background: rgba(30,144,255,0.15);
+      }
+      .settings-toggle.beach.active {
+        background: rgba(30,144,255,0.2);
+        border-color: rgba(30,144,255,0.4);
+        color: rgba(100,180,255,0.95);
+      }
+      
+      .settings-toggle.blizzard {
+        border-color: rgba(255,255,255,0.4);
+        color: rgba(255,255,255,0.9);
+      }
+      .settings-toggle.blizzard:hover {
+        background: rgba(255,255,255,0.2);
+      }
+      .settings-toggle.blizzard.active {
+        background: rgba(255,255,255,0.25);
+        border-color: rgba(255,255,255,0.5);
+        color: rgba(255,255,255,1);
+      }
+      
+      .settings-panel {
+        position: fixed;
+        top: 0;
+        right: -320px;
+        width: 300px;
+        height: 100vh;
+        background: rgba(15,15,25,0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-left: 1px solid rgba(255,255,255,0.1);
+        z-index: 1000;
+        transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto;
+        padding: 80px 24px 24px;
+        box-sizing: border-box;
+      }
+      
+      .settings-panel.open {
+        right: 0;
+      }
+      
+      .settings-panel h2 {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.5);
+        margin: 0 0 24px 0;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      .settings-group {
+        margin-bottom: 24px;
+      }
+      
+      .settings-group label {
+        display: block;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(255,255,255,0.8);
+        margin-bottom: 10px;
+        letter-spacing: 0.3px;
+      }
+      
+      .settings-group .value-display {
+        float: right;
+        font-weight: 400;
+        color: rgba(150,180,255,0.9);
+        font-size: 11px;
+      }
+      
+      .settings-slider {
+        width: 100%;
+        height: 4px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255,255,255,0.1);
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+      }
+      
+      .settings-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: linear-gradient(135deg, rgba(100,150,255,0.9), rgba(150,100,255,0.9));
+        border-radius: 50%;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 2px 8px rgba(100,150,255,0.4);
+      }
+      
+      .settings-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+        box-shadow: 0 2px 12px rgba(100,150,255,0.6);
+      }
+      
+      .settings-slider::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        background: linear-gradient(135deg, rgba(100,150,255,0.9), rgba(150,100,255,0.9));
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 8px rgba(100,150,255,0.4);
+      }
+      
+      .settings-toggle-switch {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 0;
+      }
+      
+      .settings-toggle-switch label {
+        margin-bottom: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(255,255,255,0.8);
+        letter-spacing: 0.3px;
+      }
+      
+      .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      
+      .toggle-switch.active {
+        background: linear-gradient(135deg, rgba(100,150,255,0.6), rgba(150,100,255,0.6));
+      }
+      
+      .toggle-switch::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      
+      .toggle-switch.active::after {
+        left: 23px;
+      }
+      
+      .settings-divider {
+        height: 1px;
+        background: rgba(255,255,255,0.08);
+        margin: 20px 0;
+      }
+      
+      .settings-note {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+      
+      .settings-panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.3);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      
+      .settings-panel-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      
+      /* Theme-specific settings panel styles */
+      .settings-panel.neon {
+        background: rgba(20, 10, 20, 0.95);
+        border-left-color: rgba(255, 0, 100, 0.2);
+      }
+      .settings-panel.neon h2 {
+        color: rgba(255, 100, 150, 0.6);
+        border-bottom-color: rgba(255, 0, 100, 0.2);
+      }
+      .settings-panel.neon .settings-group label {
+        color: rgba(255, 150, 180, 0.9);
+      }
+      .settings-panel.neon .value-display {
+        color: rgba(255, 100, 150, 0.9);
+      }
+      .settings-panel.neon .settings-slider::-webkit-slider-thumb {
+        background: linear-gradient(135deg, rgba(255, 0, 100, 0.9), rgba(255, 100, 150, 0.9));
+        box-shadow: 0 2px 8px rgba(255, 0, 100, 0.5);
+      }
+      .settings-panel.neon .settings-slider::-moz-range-thumb {
+        background: linear-gradient(135deg, rgba(255, 0, 100, 0.9), rgba(255, 100, 150, 0.9));
+        box-shadow: 0 2px 8px rgba(255, 0, 100, 0.5);
+      }
+      .settings-panel.neon .toggle-switch.active {
+        background: linear-gradient(135deg, rgba(255, 0, 100, 0.6), rgba(255, 100, 150, 0.6));
+      }
+      .settings-panel.neon .settings-toggle-switch label {
+        color: rgba(255, 150, 180, 0.9);
+      }
+      .settings-panel.neon .settings-divider {
+        background: rgba(255, 0, 100, 0.15);
+      }
+      
+      .settings-panel.matcha {
+        background: rgba(15, 25, 15, 0.95);
+        border-left-color: rgba(100, 180, 100, 0.2);
+      }
+      .settings-panel.matcha h2 {
+        color: rgba(140, 190, 140, 0.6);
+        border-bottom-color: rgba(100, 180, 100, 0.2);
+      }
+      .settings-panel.matcha .settings-group label {
+        color: rgba(180, 220, 180, 0.9);
+      }
+      .settings-panel.matcha .value-display {
+        color: rgba(150, 220, 150, 0.9);
+      }
+      .settings-panel.matcha .settings-slider::-webkit-slider-thumb {
+        background: linear-gradient(135deg, rgba(100, 180, 100, 0.9), rgba(150, 220, 100, 0.9));
+        box-shadow: 0 2px 8px rgba(100, 180, 100, 0.5);
+      }
+      .settings-panel.matcha .settings-slider::-moz-range-thumb {
+        background: linear-gradient(135deg, rgba(100, 180, 100, 0.9), rgba(150, 220, 100, 0.9));
+        box-shadow: 0 2px 8px rgba(100, 180, 100, 0.5);
+      }
+      .settings-panel.matcha .toggle-switch.active {
+        background: linear-gradient(135deg, rgba(100, 180, 100, 0.6), rgba(150, 220, 100, 0.6));
+      }
+      .settings-panel.matcha .settings-toggle-switch label {
+        color: rgba(180, 220, 180, 0.9);
+      }
+      .settings-panel.matcha .settings-divider {
+        background: rgba(100, 180, 100, 0.15);
+      }
+      
+      .settings-panel.beach {
+        background: rgba(10, 20, 35, 0.95);
+        border-left-color: rgba(30, 144, 255, 0.2);
+      }
+      .settings-panel.beach h2 {
+        color: rgba(135, 180, 220, 0.6);
+        border-bottom-color: rgba(30, 144, 255, 0.2);
+      }
+      .settings-panel.beach .settings-group label {
+        color: rgba(135, 206, 235, 0.9);
+      }
+      .settings-panel.beach .value-display {
+        color: rgba(100, 180, 255, 0.9);
+      }
+      .settings-panel.beach .settings-slider::-webkit-slider-thumb {
+        background: linear-gradient(135deg, rgba(30, 144, 255, 0.9), rgba(255, 180, 100, 0.9));
+        box-shadow: 0 2px 8px rgba(30, 144, 255, 0.5);
+      }
+      .settings-panel.beach .settings-slider::-moz-range-thumb {
+        background: linear-gradient(135deg, rgba(30, 144, 255, 0.9), rgba(255, 180, 100, 0.9));
+        box-shadow: 0 2px 8px rgba(30, 144, 255, 0.5);
+      }
+      .settings-panel.beach .toggle-switch.active {
+        background: linear-gradient(135deg, rgba(30, 144, 255, 0.6), rgba(255, 180, 100, 0.6));
+      }
+      .settings-panel.beach .settings-toggle-switch label {
+        color: rgba(135, 206, 235, 0.9);
+      }
+      .settings-panel.beach .settings-divider {
+        background: rgba(30, 144, 255, 0.15);
+      }
+      
+      .settings-panel.blizzard {
+        background: rgba(25, 35, 45, 0.95);
+        border-left-color: rgba(255, 255, 255, 0.2);
+      }
+      .settings-panel.blizzard h2 {
+        color: rgba(255, 255, 255, 0.6);
+        border-bottom-color: rgba(255, 255, 255, 0.2);
+      }
+      .settings-panel.blizzard .settings-group label {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .settings-panel.blizzard .value-display {
+        color: rgba(220, 240, 255, 0.95);
+      }
+      .settings-panel.blizzard .settings-slider::-webkit-slider-thumb {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(200, 230, 255, 0.9));
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.5);
+      }
+      .settings-panel.blizzard .settings-slider::-moz-range-thumb {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(200, 230, 255, 0.9));
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.5);
+      }
+      .settings-panel.blizzard .toggle-switch.active {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(200, 230, 255, 0.5));
+      }
+      .settings-panel.blizzard .settings-toggle-switch label {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .settings-panel.blizzard .settings-divider {
+        background: rgba(255, 255, 255, 0.15);
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <button id="colorToggle" class="normal">Normal</button>
+    <div class="theme-indicator">Next Theme: Chinatown</div>
+    
+    <button class="mouse-mode-toggle off" id="mouseModeToggle">
+      <div class="mouse-mode-icon"></div>
+      <span>Mouse: Off</span>
+    </button>
+    <div class="mouse-mode-hint">Click to cycle modes</div>
+    
+    <!-- Settings Panel -->
+    <button class="settings-toggle" id="settingsToggle">⚙</button>
+    <div class="settings-panel-overlay" id="settingsOverlay"></div>
+    <div class="settings-panel" id="settingsPanel">
+      <h2>Settings</h2>
+      
+      <div class="settings-group">
+        <label>Particle Count <span class="value-display" id="particleCountValue">30,000</span></label>
+        <input type="range" class="settings-slider" id="particleCountSlider" min="1000" max="150000" step="1000" value="30000">
+        <p class="settings-note">Requires reload to take effect</p>
+      </div>
+      
+      <div class="settings-group">
+        <label>Particle Speed <span class="value-display" id="particleSpeedValue">1.0x</span></label>
+        <input type="range" class="settings-slider" id="particleSpeedSlider" min="0.05" max="10" step="0.05" value="1">
+      </div>
+      
+      <div class="settings-group">
+        <label>Noise Scale <span class="value-display" id="noiseScaleValue">1.5</span></label>
+        <input type="range" class="settings-slider" id="noiseScaleSlider" min="0.5" max="4" step="0.1" value="1.5">
+      </div>
+      
+      <div class="settings-divider"></div>
+      
+      <div class="settings-group">
+        <label>Trail Length <span class="value-display" id="trailLengthValue">25</span></label>
+        <input type="range" class="settings-slider" id="trailLengthSlider" min="5" max="50" step="1" value="25">
+      </div>
+      
+      <div class="settings-divider"></div>
+      
+      <div class="settings-group">
+        <label>Mouse Force Strength <span class="value-display" id="forceStrengthValue">1.0x</span></label>
+        <input type="range" class="settings-slider" id="forceStrengthSlider" min="0.1" max="5" step="0.1" value="1">
+        <p class="settings-note">Adjusts attract/repel intensity</p>
+      </div>
+      
+      <div class="settings-divider"></div>
+      
+      <div class="settings-toggle-switch">
+        <label>Show Clock</label>
+        <div class="toggle-switch active" id="clockToggle"></div>
+      </div>
+      
+      <div class="settings-toggle-switch">
+        <label>Show Audio</label>
+        <div class="toggle-switch active" id="audioVisibilityToggle"></div>
+      </div>
+      
+      <div class="settings-toggle-switch">
+        <label>Hold to Reset</label>
+        <div class="toggle-switch active" id="holdResetToggle"></div>
+      </div>
+      
+      <div class="settings-divider"></div>
+      
+      <p class="settings-note" style="margin-top: 24px;">
+        Tip: Hold click anywhere on the canvas for 3 seconds to reset particle positions.
+      </p>
+    </div>
+    
+    <div class="center-display normal" id="centerDisplay">
+      <div class="center-title">Mesher</div>
+      <div class="center-time" id="centerTime">00:00</div>
+      <div class="center-date" id="centerDate">January 25, 2026</div>
+    </div>
+    
+    <div id="resetIndicator">
+      <svg viewBox="0 0 80 80">
+        <circle class="bg-circle" cx="40" cy="40" r="36"></circle>
+        <circle class="progress-circle" cx="40" cy="40" r="36"></circle>
+      </svg>
+    </div>
+    
+    <div class="music-player normal" id="musicPlayer">
+      <div class="audio-visualizer normal" id="audioVisualizer">
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+        <div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div><div class="audio-bar"></div>
+      </div>
+      <div class="song-title" id="songTitle">Select a song to play</div>
+      <div class="player-controls">
+        <button class="player-btn" id="shuffleBtn" title="Shuffle">
+          <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+        </button>
+        <button class="player-btn" id="prevBtn" title="Previous">
+          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="player-btn play-btn" id="playBtn" title="Play">
+          <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="player-btn" id="nextBtn" title="Next">
+          <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+        <button class="player-btn" id="loopBtn" title="Loop">
+          <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+        </button>
+        <div class="player-divider"></div>
+        <button class="player-btn" id="volDownBtn" title="Volume Down">
+          <svg viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/></svg>
+        </button>
+        <button class="player-btn" id="volUpBtn" title="Volume Up">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Core Libraries -->
+    <script src = "lib/three.min.js"                ></script>
+    <script src = "lib/jquery.min.js"               ></script>
+    <script src = "lib/ShaderLoader.js"             ></script>
+    <script src = "lib/TrackballControls.js"        ></script>
+    
+    <!-- GPGPU Physics Renderer -->
+    <script src = "lib/PhysicsRenderer.js"          ></script>
+
+    <!-- Instanced Mesh System -->
+    <script src = "InstanceMesh.js"                 ></script>
+
+    <!-- Feather Geometry -->
+    <script src = "Curl/Feather.js"                 ></script>
+
+    <!-- Curl Simulation Controller -->
+    <script src = "Curl/Curl.js"                    ></script>
+    
+    <script>
+
+      var camera, renderer, scene, controls, clock;
+      var ambientLight, ambientLightTime = 0;
+      var speedMultiplier = 1.0; // Global speed multiplier for settings panel
+      
+      // Ambient light settings for slow breathing effect
+      var ambientLightConfig = {
+        baseIntensity: 0.15,
+        pulseAmount: 0.1,
+        breathSpeed: 0.3  // Slow, meditative breathing
+      };
+      
+      // Uniforms for the GPGPU curl noise simulation
+      var soulUniforms = {
+        dT:        { type: "f", value: 0 },
+        noiseSize: { type: "f", value: 1.5 },  // Controls curl noise scale
+        audioLevel: { type: "f", value: 0.0 },  // Audio reactivity level (0-1)
+        mousePos:  { type: "v3", value: new THREE.Vector3(0, 0, 0) },  // Mouse position in world space
+        mouseForce: { type: "f", value: 0.0 }  // -1 = repel, 0 = off, 1 = attract
+      };
+
+      // Additional body uniforms for rendering
+      var bodyUniforms = {
+        // Will be populated by Curl.js with t_pos, t_oPos, t_ooPos
+        colorMode: { type: "f", value: 0.0 }  // 0 = normal, 1 = neon, 2 = matcha, 3 = beach
+      };
+      
+      var currentTheme = 0;
+      var themes = [
+        { name: 'normal', label: 'Chinatown', display: 'Normal', bg: 0x111122 },
+        { name: 'neon', label: 'Matcha', display: 'Chinatown', bg: 0x0a0a12 },
+        { name: 'matcha', label: 'Ocean', display: 'Matcha', bg: 0x0d1a0d },
+        { name: 'beach', label: 'Blizzard', display: 'Ocean', bg: 0x0a1525 },
+        { name: 'blizzard', label: 'Normal', display: 'Blizzard', bg: 0x1a2530 }
+      ];
+
+      var curlParticles;
+
+      var shaders = new ShaderLoader('shaders');
+
+      shaders.shaderSetLoaded = function(){
+        init();
+        animate();
+      };
+
+      // Load curl noise simulation shader
+      shaders.load('ss-curl', 'curl', 'simulation');
+      
+      // Load vertex and fragment shaders for rendering instanced feathers
+      shaders.load('vs-snake', 'feather', 'vertex');
+      shaders.load('fs-snake', 'feather', 'fragment');
+
+      function init(){
+
+        var w = window.innerWidth;
+        var h = window.innerHeight;
+
+        // Setup camera
+        camera = new THREE.PerspectiveCamera(65, w/h, 0.001, 10);
+        camera.position.z = 2;
+   
+        scene = new THREE.Scene();
+        
+        // Add pulsing ambient light for atmospheric glow
+        ambientLight = new THREE.AmbientLight(0x4466aa, ambientLightConfig.baseIntensity);
+        scene.add(ambientLight);
+
+        // Setup renderer with high DPI support
+        var dpr = window.devicePixelRatio || 1;
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x111122);
+
+        document.body.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', onWindowResize, false);
+
+        // Setup trackball controls for camera interaction
+        controls = new THREE.TrackballControls(camera);
+        controls.rotateSpeed = 2.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+
+        clock = new THREE.Clock();
+
+        // Create feather geometry for instanced mesh
+        // Feather(size) returns a THREE.Geometry shaped like a feather
+        var featherGeometry = new Feather(0.015);
+
+        console.log('Vertex Shader:', shaders.vs.feather);
+        console.log('Fragment Shader:', shaders.fs.feather);
+        console.log('Simulation Shader:', shaders.ss.curl);
+
+        // Load saved particle count from localStorage
+        var instanceCount = 30000;
+        var savedCount = localStorage.getItem('mesher_particleCount');
+        if (savedCount) {
+          instanceCount = parseInt(savedCount);
+        }
+
+        // Create the Curl particle system using:
+        // - InstanceMesh.js for efficient instanced rendering
+        // - PhysicsRenderer.js for GPGPU physics simulation
+        // - Feather.js for feather geometry
+        curlParticles = new Curl({
+
+          soulUniforms:     soulUniforms,      // Uniforms for simulation (dT, noiseSize)
+          bodyUniforms:     bodyUniforms,      // Uniforms for rendering
+          
+          geometry:         featherGeometry,   // Feather geometry instead of box
+          instanceNumber:   instanceCount,     // Number of feather instances (from settings)
+          renderer:         renderer,          // WebGL renderer for GPGPU
+          
+          vertexShader:     shaders.vs.feather,   // Vertex shader for instanced feathers
+          fragmentShader:   shaders.fs.feather,   // Fragment shader for coloring
+          
+          simulationShader: shaders.ss.curl,   // GPGPU curl noise simulation shader
+
+        });
+
+        // Activate the particle system (adds to scene and starts simulation)
+        curlParticles.activate(scene);
+
+        // Optional: Enable debug view to see GPGPU textures
+        // curlParticles.debug();
+        
+        // Setup color theme toggle
+        var toggleBtn = document.getElementById('colorToggle');
+        var themeIndicator = document.querySelector('.theme-indicator');
+        var centerDisplay = document.getElementById('centerDisplay');
+        var centerTime = document.getElementById('centerTime');
+        var centerDate = document.getElementById('centerDate');
+        
+        // Update time function
+        function updateTime() {
+          var now = new Date();
+          var hours = now.getHours().toString().padStart(2, '0');
+          var minutes = now.getMinutes().toString().padStart(2, '0');
+          centerTime.textContent = hours + ':' + minutes;
+          
+          var options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+          centerDate.textContent = now.toLocaleDateString('en-US', options);
+        }
+        
+        // Initial time update and set interval
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        toggleBtn.addEventListener('click', function() {
+          currentTheme = (currentTheme + 1) % 5;
+          var theme = themes[currentTheme];
+          
+          bodyUniforms.colorMode.value = currentTheme;
+          toggleBtn.textContent = theme.display;
+          toggleBtn.className = theme.name;
+          themeIndicator.textContent = 'Next Theme: ' + theme.label;
+          renderer.setClearColor(theme.bg);
+          
+          // Update center display theme
+          centerDisplay.className = 'center-display ' + theme.name;
+          
+          // Update settings panel theme
+          settingsPanel.className = 'settings-panel' + (settingsPanelOpen ? ' open' : '') + ' ' + theme.name;
+          
+          // Update settings toggle button theme
+          settingsToggle.className = 'settings-toggle' + (settingsPanelOpen ? ' active' : '') + ' ' + theme.name;
+        });
+        
+        // Hold-to-reset functionality
+        var resetIndicator = document.getElementById('resetIndicator');
+        var progressCircle = resetIndicator.querySelector('.progress-circle');
+        var holdStartTime = null;
+        var holdDuration = 3000; // 3 seconds
+        var circumference = 2 * Math.PI * 36; // r=36
+        var isHolding = false;
+        var resetAnimationId = null;
+        var holdResetEnabled = true; // Toggle for enabling/disabling hold reset
+        
+        function updateResetProgress() {
+          if (!isHolding || !holdStartTime) return;
+          
+          var elapsed = Date.now() - holdStartTime;
+          var progress = Math.min(elapsed / holdDuration, 1);
+          var offset = circumference * (1 - progress);
+          progressCircle.style.strokeDashoffset = offset;
+          
+          if (progress >= 1) {
+            // Reset complete
+            resetIndicator.classList.add('complete');
+            curlParticles.soul.resetRand(0.2);
+            
+            setTimeout(function() {
+              resetIndicator.classList.remove('active', 'complete');
+              progressCircle.style.strokeDashoffset = circumference;
+            }, 300);
+            
+            isHolding = false;
+            holdStartTime = null;
+          } else {
+            resetAnimationId = requestAnimationFrame(updateResetProgress);
+          }
+        }
+        
+        function startHold(e) {
+          // Check if hold reset is enabled
+          if (!holdResetEnabled) return;
+          
+          // Ignore if clicking on UI elements
+          if (e.target.closest('#colorToggle') || 
+              e.target.closest('.theme-indicator') ||
+              e.target.closest('#settingsToggle') ||
+              e.target.closest('#settingsPanel') ||
+              e.target.closest('#mouseModeToggle') ||
+              e.target.closest('.mouse-mode-hint') ||
+              e.target.closest('.music-player')) return;
+          
+          isHolding = true;
+          holdStartTime = Date.now();
+          resetIndicator.classList.add('active');
+          resetIndicator.classList.remove('complete');
+          progressCircle.style.strokeDashoffset = circumference;
+          updateResetProgress();
+        }
+        
+        function endHold() {
+          if (!isHolding) return;
+          
+          isHolding = false;
+          holdStartTime = null;
+          if (resetAnimationId) {
+            cancelAnimationFrame(resetAnimationId);
+          }
+          resetIndicator.classList.remove('active', 'complete');
+          progressCircle.style.strokeDashoffset = circumference;
+        }
+        
+        document.addEventListener('mousedown', startHold);
+        document.addEventListener('mouseup', endHold);
+        document.addEventListener('mouseleave', endHold);
+        document.addEventListener('touchstart', startHold);
+        document.addEventListener('touchend', endHold);
+        document.addEventListener('touchcancel', endHold);
+        
+        // Laser Mouse Trail
+        var trailPoints = [];
+        var maxTrailLength = 25;
+        var lastMouseX = 0;
+        var lastMouseY = 0;
+        var trailContainer = document.createElement('div');
+        trailContainer.id = 'laserTrailContainer';
+        document.body.appendChild(trailContainer);
+        
+        function createTrailSegment(x1, y1, x2, y2, index, total) {
+          var segment = document.createElement('div');
+          segment.className = 'laser-trail ' + themes[currentTheme].name;
+          
+          var dx = x2 - x1;
+          var dy = y2 - y1;
+          var length = Math.sqrt(dx * dx + dy * dy);
+          var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          
+          var opacity = (index / total) * 0.9 + 0.1;
+          var width = Math.max(1, (index / total) * 3 + 1);
+          
+          segment.style.cssText = 
+            'left: ' + x1 + 'px; ' +
+            'top: ' + (y1 - width/2) + 'px; ' +
+            'width: ' + length + 'px; ' +
+            'height: ' + width + 'px; ' +
+            'opacity: ' + opacity + '; ' +
+            'transform: rotate(' + angle + 'deg);';
+          
+          return segment;
+        }
+        
+        function updateTrail() {
+          trailContainer.innerHTML = '';
+          
+          for (var i = 1; i < trailPoints.length; i++) {
+            var p1 = trailPoints[i - 1];
+            var p2 = trailPoints[i];
+            var segment = createTrailSegment(p1.x, p1.y, p2.x, p2.y, i, trailPoints.length);
+            trailContainer.appendChild(segment);
+          }
+        }
+        
+        function onMouseMove(e) {
+          var mouseX = e.clientX;
+          var mouseY = e.clientY;
+          
+          var dx = mouseX - lastMouseX;
+          var dy = mouseY - lastMouseY;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 3) {
+            trailPoints.push({ x: mouseX, y: mouseY });
+            
+            if (trailPoints.length > maxTrailLength) {
+              trailPoints.shift();
+            }
+            
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            
+            updateTrail();
+          }
+        }
+        
+        function fadeTrail() {
+          if (trailPoints.length > 0) {
+            trailPoints.shift();
+            updateTrail();
+          }
+        }
+        
+        setInterval(fadeTrail, 30);
+        
+        document.addEventListener('mousemove', onMouseMove);
+        
+        // Music Player System
+        var musicPlayer = document.getElementById('musicPlayer');
+        var audioVisualizer = document.getElementById('audioVisualizer');
+        var songTitle = document.getElementById('songTitle');
+        var playBtn = document.getElementById('playBtn');
+        var playIcon = document.getElementById('playIcon');
+        var prevBtn = document.getElementById('prevBtn');
+        var nextBtn = document.getElementById('nextBtn');
+        var shuffleBtn = document.getElementById('shuffleBtn');
+        var loopBtn = document.getElementById('loopBtn');
+        var volUpBtn = document.getElementById('volUpBtn');
+        var volDownBtn = document.getElementById('volDownBtn');
+        var audioBars = audioVisualizer.querySelectorAll('.audio-bar');
+        var smoothedLevel = 0;
+        
+        // Audio context for visualizer
+        var audioContext = null;
+        var analyser = null;
+        var audioSource = null;
+        var dataArray = null;
+        
+        // Music playlist
+        var playlist = [
+          "A Million Dreams.mp3",
+          "ATARAXIA.mp3",
+          "Compass.mp3",
+          "Down By The River.mp3",
+          "Dragon Age Inquisition Theme.mp3",
+          "Ghost Duet - Louie Zong.mp3",
+          "Girls.mp3",
+          "Just the Two of Us.mp3",
+          "Quiet Galaxy.mp3",
+          "Secret Base.mp3",
+          "Something Just Like This.mp3",
+          "Spica.mp3",
+          "Suzume.mp3",
+          "Swarms of Song.mp3",
+          "Von.mp3",
+          "You Will Be Okay.mp3",
+          "妖精の霧.mp3",
+          "忘れじの言の葉.mp3"
+        ];
+        
+        var currentTrack = 0;
+        var isPlaying = false;
+        var isLooping = false;
+        var isShuffling = false;
+        var audio = new Audio();
+        audio.volume = 0.7;
+        
+        // Extract clean song name from filename
+        function getSongName(filename) {
+          var name = filename.replace('.mp3', '');
+          // Remove leading track numbers like "39  "
+          name = name.replace(/^\d+\s+/, '');
+          return name;
+        }
+        
+        // Initialize audio context for visualizer
+        function initAudioContext() {
+          if (audioContext) return;
+          
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.85;
+          
+          audioSource = audioContext.createMediaElementSource(audio);
+          audioSource.connect(analyser);
+          analyser.connect(audioContext.destination);
+          
+          dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
+        
+        // Load and play track
+        function loadTrack(index) {
+          currentTrack = index;
+          audio.src = 'music/' + encodeURIComponent(playlist[index]);
+          songTitle.textContent = getSongName(playlist[index]);
+          
+          if (isPlaying) {
+            audio.play();
+          }
+        }
+        
+        // Play/Pause toggle
+        function togglePlay() {
+          if (!audioContext) {
+            initAudioContext();
+          }
+          
+          if (audioContext.state === 'suspended') {
+            audioContext.resume();
+          }
+          
+          if (isPlaying) {
+            audio.pause();
+            isPlaying = false;
+            playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            audioVisualizer.classList.remove('active');
+          } else {
+            audio.play();
+            isPlaying = true;
+            playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            audioVisualizer.classList.add('active');
+            updateVisualizer();
+          }
+        }
+        
+        // Next track
+        function nextTrack() {
+          if (isShuffling) {
+            var newIndex;
+            do {
+              newIndex = Math.floor(Math.random() * playlist.length);
+            } while (newIndex === currentTrack && playlist.length > 1);
+            loadTrack(newIndex);
+          } else {
+            loadTrack((currentTrack + 1) % playlist.length);
+          }
+        }
+        
+        // Previous track
+        function prevTrack() {
+          if (audio.currentTime > 3) {
+            audio.currentTime = 0;
+          } else {
+            loadTrack((currentTrack - 1 + playlist.length) % playlist.length);
+          }
+        }
+        
+        // Toggle loop
+        function toggleLoop() {
+          isLooping = !isLooping;
+          audio.loop = isLooping;
+          loopBtn.classList.toggle('active', isLooping);
+        }
+        
+        // Toggle shuffle
+        function toggleShuffle() {
+          isShuffling = !isShuffling;
+          shuffleBtn.classList.toggle('active', isShuffling);
+        }
+        
+        // Volume controls
+        function volumeUp() {
+          audio.volume = Math.min(1, audio.volume + 0.1);
+        }
+        
+        function volumeDown() {
+          audio.volume = Math.max(0, audio.volume - 0.1);
+        }
+        
+        // Update visualizer
+        function updateVisualizer() {
+          if (!isPlaying || !analyser) return;
+          
+          analyser.getByteFrequencyData(dataArray);
+          
+          // Calculate average level for particle reactivity
+          var sum = 0;
+          for (var i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          var average = sum / dataArray.length / 255;
+          smoothedLevel = smoothedLevel * 0.7 + average * 0.3;
+          soulUniforms.audioLevel.value = smoothedLevel;
+          
+          // Update visualizer bars
+          var barCount = audioBars.length;
+          var step = Math.floor(dataArray.length / barCount);
+          for (var i = 0; i < barCount; i++) {
+            var value = dataArray[i * step] || 0;
+            var height = Math.max(2, (value / 255) * 26);
+            audioBars[i].style.height = height + 'px';
+          }
+          
+          requestAnimationFrame(updateVisualizer);
+        }
+        
+        // Event listeners
+        playBtn.addEventListener('click', togglePlay);
+        nextBtn.addEventListener('click', nextTrack);
+        prevBtn.addEventListener('click', prevTrack);
+        loopBtn.addEventListener('click', toggleLoop);
+        shuffleBtn.addEventListener('click', toggleShuffle);
+        volUpBtn.addEventListener('click', volumeUp);
+        volDownBtn.addEventListener('click', volumeDown);
+        
+        // Auto-play next track when current ends
+        audio.addEventListener('ended', function() {
+          if (!isLooping) {
+            nextTrack();
+          }
+        });
+        
+        // Load first track (but don't play)
+        loadTrack(0);
+        
+        // Update music player theme when theme changes
+        toggleBtn.addEventListener('click', function() {
+          var theme = themes[currentTheme];
+          musicPlayer.className = 'music-player ' + theme.name;
+          audioVisualizer.className = 'audio-visualizer ' + theme.name + (isPlaying ? ' active' : '');
+        });
+        
+        // Mouse Attraction/Repulsion System
+        var mouseModeToggle = document.getElementById('mouseModeToggle');
+        var mouseModeHint = document.querySelector('.mouse-mode-hint');
+        var mouseMode = 0; // 0 = off, 1 = attract, 2 = repel
+        var forceStrength = 1.0; // Multiplier for force intensity
+        var mouseModes = [
+          { name: 'off', label: 'Mouse: Off', force: 0.0 },
+          { name: 'attract', label: 'Mouse: Attract', force: 1.0 },
+          { name: 'repel', label: 'Mouse: Repel', force: -1.0 }
+        ];
+        
+        // Raycaster for converting screen coords to world coords
+        var raycaster = new THREE.Raycaster();
+        var mouseNDC = new THREE.Vector2();
+        var mousePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        var mouseWorldPos = new THREE.Vector3();
+        
+        function updateMouseWorldPosition(e) {
+          // Convert screen coords to normalized device coordinates (-1 to 1)
+          mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+          mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          
+          // Cast ray from camera through mouse position
+          raycaster.setFromCamera(mouseNDC, camera);
+          
+          // Intersect with a plane at z=0
+          raycaster.ray.intersectPlane(mousePlane, mouseWorldPos);
+          
+          // Update uniform
+          soulUniforms.mousePos.value.copy(mouseWorldPos);
+        }
+        
+        document.addEventListener('mousemove', function(e) {
+          if (mouseMode !== 0) {
+            updateMouseWorldPosition(e);
+          }
+        });
+        
+        mouseModeToggle.addEventListener('click', function() {
+          mouseMode = (mouseMode + 1) % 3;
+          var mode = mouseModes[mouseMode];
+          
+          mouseModeToggle.className = 'mouse-mode-toggle ' + mode.name;
+          mouseModeToggle.querySelector('span').textContent = mode.label;
+          soulUniforms.mouseForce.value = mode.force * forceStrength;
+          
+          // Update hint text
+          if (mouseMode === 0) {
+            mouseModeHint.textContent = 'Click to cycle modes';
+          } else if (mouseMode === 1) {
+            mouseModeHint.textContent = 'Particles follow cursor';
+          } else {
+            mouseModeHint.textContent = 'Particles flee cursor';
+          }
+        });
+        
+        // Settings Panel
+        var settingsToggle = document.getElementById('settingsToggle');
+        var settingsPanel = document.getElementById('settingsPanel');
+        var settingsOverlay = document.getElementById('settingsOverlay');
+        var settingsPanelOpen = false;
+        
+        // Store initial settings for particle count (requires reload)
+        var pendingParticleCount = 30000;
+        
+        function openSettings() {
+          settingsPanelOpen = true;
+          settingsPanel.className = 'settings-panel open ' + themes[currentTheme].name;
+          settingsOverlay.classList.add('active');
+          settingsToggle.className = 'settings-toggle active ' + themes[currentTheme].name;
+        }
+        
+        function closeSettings() {
+          settingsPanelOpen = false;
+          settingsPanel.className = 'settings-panel ' + themes[currentTheme].name;
+          settingsOverlay.classList.remove('active');
+          settingsToggle.className = 'settings-toggle ' + themes[currentTheme].name;
+        }
+        
+        settingsToggle.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (settingsPanelOpen) {
+            closeSettings();
+          } else {
+            openSettings();
+          }
+        });
+        
+        settingsOverlay.addEventListener('click', closeSettings);
+        
+        // Prevent TrackballControls from intercepting settings panel events
+        settingsPanel.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+        settingsPanel.addEventListener('mousemove', function(e) { e.stopPropagation(); });
+        settingsPanel.addEventListener('mouseup', function(e) { e.stopPropagation(); });
+        settingsPanel.addEventListener('wheel', function(e) { e.stopPropagation(); });
+        
+        // Particle Count Slider
+        var particleCountSlider = document.getElementById('particleCountSlider');
+        var particleCountValue = document.getElementById('particleCountValue');
+        
+        particleCountSlider.addEventListener('input', function() {
+          var value = parseInt(this.value);
+          pendingParticleCount = value;
+          particleCountValue.textContent = value.toLocaleString();
+          // Store in localStorage for reload
+          localStorage.setItem('mesher_particleCount', value);
+        });
+        
+        // Load saved particle count
+        var savedParticleCount = localStorage.getItem('mesher_particleCount');
+        if (savedParticleCount) {
+          particleCountSlider.value = savedParticleCount;
+          particleCountValue.textContent = parseInt(savedParticleCount).toLocaleString();
+        }
+        
+        // Particle Speed Slider
+        var particleSpeedSlider = document.getElementById('particleSpeedSlider');
+        var particleSpeedValue = document.getElementById('particleSpeedValue');
+        
+        particleSpeedSlider.addEventListener('input', function() {
+          speedMultiplier = parseFloat(this.value);
+          particleSpeedValue.textContent = speedMultiplier.toFixed(1) + 'x';
+        });
+        
+        // Noise Scale Slider
+        var noiseScaleSlider = document.getElementById('noiseScaleSlider');
+        var noiseScaleValue = document.getElementById('noiseScaleValue');
+        
+        noiseScaleSlider.addEventListener('input', function() {
+          var value = parseFloat(this.value);
+          soulUniforms.noiseSize.value = value;
+          noiseScaleValue.textContent = value.toFixed(1);
+        });
+        
+        // Trail Length Slider
+        var trailLengthSlider = document.getElementById('trailLengthSlider');
+        var trailLengthValue = document.getElementById('trailLengthValue');
+        
+        trailLengthSlider.addEventListener('input', function() {
+          maxTrailLength = parseInt(this.value);
+          trailLengthValue.textContent = maxTrailLength;
+          // Trim existing trail if needed
+          while (trailPoints.length > maxTrailLength) {
+            trailPoints.shift();
+          }
+        });
+        
+        // Force Strength Slider
+        var forceStrengthSlider = document.getElementById('forceStrengthSlider');
+        var forceStrengthValue = document.getElementById('forceStrengthValue');
+        
+        forceStrengthSlider.addEventListener('input', function() {
+          forceStrength = parseFloat(this.value);
+          forceStrengthValue.textContent = forceStrength.toFixed(1) + 'x';
+          // Update current force with new strength
+          var mode = mouseModes[mouseMode];
+          soulUniforms.mouseForce.value = mode.force * forceStrength;
+        });
+        
+        // Clock Visibility Toggle
+        var clockToggle = document.getElementById('clockToggle');
+        var clockVisible = true;
+        
+        clockToggle.addEventListener('click', function() {
+          clockVisible = !clockVisible;
+          clockToggle.classList.toggle('active', clockVisible);
+          centerDisplay.style.opacity = clockVisible ? '1' : '0';
+          centerDisplay.style.pointerEvents = clockVisible ? 'none' : 'none';
+        });
+        
+        // Audio Visibility Toggle
+        var audioVisibilityToggle = document.getElementById('audioVisibilityToggle');
+        var audioVisible = true;
+        
+        audioVisibilityToggle.addEventListener('click', function() {
+          audioVisible = !audioVisible;
+          audioVisibilityToggle.classList.toggle('active', audioVisible);
+          musicPlayer.style.opacity = audioVisible ? '1' : '0';
+          musicPlayer.style.pointerEvents = audioVisible ? 'auto' : 'none';
+        });
+        
+        // Hold Reset Toggle
+        var holdResetToggle = document.getElementById('holdResetToggle');
+        
+        holdResetToggle.addEventListener('click', function() {
+          holdResetEnabled = !holdResetEnabled;
+          holdResetToggle.classList.toggle('active', holdResetEnabled);
+        });
+
+      }
+
+      
+      function animate(){
+
+        requestAnimationFrame(animate);
+        controls.update();
+
+        // Update time delta for physics simulation (with speed multiplier)
+        var dt = clock.getDelta();
+        soulUniforms.dT.value = dt * speedMultiplier;
+        
+        // Update ambient light breathing effect
+        ambientLightTime += dt * ambientLightConfig.breathSpeed;
+        var breathCycle = (Math.sin(ambientLightTime) + 1) * 0.5; // 0 to 1
+        ambientLight.intensity = ambientLightConfig.baseIntensity + (breathCycle * ambientLightConfig.pulseAmount);
+        
+        // Update GPGPU physics simulation
+        curlParticles.update();
+
+        renderer.render(scene, camera);
+      }
+
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+    </script>
+
+  </body>
+</html>
