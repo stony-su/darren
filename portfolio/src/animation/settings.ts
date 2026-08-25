@@ -12,11 +12,11 @@ export interface PlaygroundSettings {
 
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
   speed: 1,
-  noiseSize: 1.5,
+  noiseSize: 0.5,
   mouseMode: 'auto',
   mouseStrength: 1,
   trailOverride: null,
-  bloomMult: 1,
+  bloomMult: 0.15,
   count: null,
 };
 

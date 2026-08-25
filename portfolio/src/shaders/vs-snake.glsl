@@ -11,6 +11,15 @@ varying vec2 vLookup;
 varying float vSpeed;
 varying float vViewZ;
 
+// Stable, uniformly-distributed unit vector per instance. Used as the resting
+// orientation for particles that have stopped moving.
+vec3 restAxis( vec2 lk ){
+  float a = fract( sin( dot( lk , vec2( 12.9898 , 78.233 ) ) ) * 43758.5453 ) * 6.2831853;
+  float u = fract( sin( dot( lk , vec2( 39.3468 , 11.1350 ) ) ) * 24634.6345 ) * 2.0 - 1.0;
+  float r = sqrt( max( 0.0 , 1.0 - u * u ) );
+  return vec3( r * cos( a ) , r * sin( a ) , u );
+}
+
 void main(){
 
   vLookup = lookup;
@@ -27,9 +36,29 @@ void main(){
 
   vSpeed = length( d1 );
 
-  vec3 z = vSpeed > 1e-8 ? normalize( d1 ) : vec3( 0.0, 0.0, 1.0 );
+  // Ease into a per-instance resting axis as the particle slows. A held text
+  // formation damps velocity to zero against a static curl field, so every
+  // settled particle used to take the same constant fallback axis — and since
+  // the feather's normals are all +Z, vNorm IS this axis, which painted the
+  // whole word one flat colour under theme 0's normal shading. Worse, at rest
+  // the stored positions differ by either zero or a single float32 ulp, so a
+  // hard threshold flipped the axis on and off frame to frame. Blending on a
+  // speed scale ~50x below normal flow keeps moving particles untouched while
+  // giving settled ones a quiet, varied orientation.
+  vec3 rest = restAxis( lookup );
+  float motion = smoothstep( 0.0 , 6e-5 , vSpeed );
+  vec3 zMix = mix( rest , d1 / max( vSpeed , 1e-12 ) , motion );
+  float zLen = length( zMix );
+  vec3 z = zLen > 1e-6 ? zMix / zLen : rest;
+
+  // Roll the feather into its trajectory plane; when that plane collapses fall
+  // back to a branchless orthonormal tangent (Duff et al.) derived from z, so
+  // the basis stays per-particle instead of snapping to a shared constant.
   vec3 xr = cross( z , normalize( d2 + vec3( 1e-7 ) ) );
-  vec3 x = length( xr ) > 1e-8 ? normalize( xr ) : vec3( 1.0, 0.0, 0.0 );
+  float sgn = z.z >= 0.0 ? 1.0 : -1.0;
+  float ia  = -1.0 / ( sgn + z.z );
+  vec3 xOnb = vec3( 1.0 + sgn * z.x * z.x * ia , sgn * z.x * z.y * ia , -sgn * z.x );
+  vec3 x = length( xr ) > 1e-6 ? normalize( xr ) : xOnb;
   vec3 y = cross( z , x );
 
   mat3 rot = mat3(

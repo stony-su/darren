@@ -5,7 +5,7 @@ import { PostPipeline } from './PostPipeline';
 import { createTextTargetTexture } from './TextTargets';
 import { pickTier, lowerTier, TIER_COUNTS, FrameMonitor } from './quality';
 import type { QualityTier } from './quality';
-import { loadSettings } from './settings';
+import { loadSettings, DEFAULT_SETTINGS } from './settings';
 import type { MouseMode } from './settings';
 import { THEMES, bgToRgb } from '../theme/themes';
 import { applyThemeCssVars } from '../theme/themes';
@@ -55,7 +55,7 @@ export class ParticleScene {
 
   // Playground / interaction state
   private speedMultiplier = 1;
-  private bloomMult = 1;
+  private bloomMult = DEFAULT_SETTINGS.bloomMult;
   private trailOverride: number | null = null;
   private panelMouseMode: MouseMode = 'auto';
   private autoAttract = false;
@@ -123,7 +123,7 @@ export class ParticleScene {
     // the sim material compiles once against this exact set.
     this.soulUniforms = {
       dT: { value: 0 },
-      noiseSize: { value: 1.5 },
+      noiseSize: { value: DEFAULT_SETTINGS.noiseSize },
       exclusionRadius: { value: 0.35 },
       mousePos: { value: new THREE.Vector3(0, 0, 0) },
       mouseForce: { value: 0.0 },

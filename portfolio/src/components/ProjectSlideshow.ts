@@ -2,6 +2,7 @@ import type { Project } from '../data/projects';
 import { PROJECTS } from '../data/projects';
 import { ParticleScene } from '../animation/scene';
 import { THEMES } from '../theme/themes';
+import { ProgressRail } from './ProgressRail';
 
 /** Per-slide ambient wind directions (title/closing are calm). */
 const WIND_TABLE: [number, number, number][] = [
@@ -31,11 +32,13 @@ export class ProjectSlideshow {
   private container: HTMLElement;
   private scene: ParticleScene;
   private slideshowEl!: HTMLElement;
-  private railButtons: HTMLElement[] = [];
+  private rail: ProgressRail | null = null;
   private gridOverlay: HTMLElement | null = null;
   private lastFocused: HTMLElement | null = null;
   private currentIndex = 0;
   private lastScrollLeft = 0;
+  private ghostEls: HTMLElement[] = [];
+  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private scrollRafPending = false;
   private hashTimer: number | null = null;
   private boundKeyHandler: (e: KeyboardEvent) => void;
@@ -87,10 +90,15 @@ export class ProjectSlideshow {
     this.currentIndex = initial;
     this.lastScrollLeft = initial * window.innerWidth;
 
+    // Ghost titles sit behind the cards; parallax offsets update on scroll
+    this.ghostEls = Array.from(this.slideshowEl.querySelectorAll<HTMLElement>('.ghost-title'));
+    this.updateGhostParallax();
+
     this.setupScrollTracking();
     this.setupWheelRedirect();
     this.setupVideoScrubbers();
     this.setupCaseStudies();
+    this.setupCardTilt();
 
     window.addEventListener('keydown', this.boundKeyHandler);
     window.addEventListener('resize', this.boundResizeHandler);
@@ -141,6 +149,7 @@ export class ProjectSlideshow {
 
         // Particles track the visible card even mid-scroll
         this.updateCardRect();
+        this.updateGhostParallax();
       });
     }, { passive: true });
   }
@@ -156,6 +165,9 @@ export class ProjectSlideshow {
 
     this.updateRail();
     this.updateCardRect();
+    // Programmatic jumps (deep links, goTo) don't always fire a scroll event
+    // before the next paint — sync the ghosts here too.
+    this.updateGhostParallax();
 
     // Debounced hash update
     if (this.hashTimer !== null) window.clearTimeout(this.hashTimer);
@@ -169,6 +181,38 @@ export class ProjectSlideshow {
     const slide = slides[this.currentIndex];
     const card = slide?.querySelector('.project-card');
     this.scene.setCardRect(card ? card.getBoundingClientRect() : null);
+  }
+
+  /** Ghost titles drift slower than the cards, reading as a layer behind. */
+  private updateGhostParallax(): void {
+    if (this.reducedMotion) return;
+    const left = this.slideshowEl.scrollLeft;
+    const w = window.innerWidth;
+    this.ghostEls.forEach((el, i) => {
+      const offset = (i + 1) * w - left; // ghost i belongs to slide i+1
+      el.style.setProperty('--ghost-par', `${(-offset * 0.3).toFixed(1)}px`);
+    });
+  }
+
+  /* ── Pointer tilt + specular glare ── */
+
+  private setupCardTilt(): void {
+    if (this.reducedMotion || window.matchMedia('(hover: none)').matches) return;
+    this.slideshowEl.querySelectorAll<HTMLElement>('.project-card').forEach((card) => {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+        card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+        card.style.setProperty('--ry', `${((x - 0.5) * 4.5).toFixed(2)}deg`);
+        card.style.setProperty('--rx', `${((0.5 - y) * 3.5).toFixed(2)}deg`);
+      });
+      card.addEventListener('pointerleave', () => {
+        card.style.setProperty('--rx', '0deg');
+        card.style.setProperty('--ry', '0deg');
+      });
+    });
   }
 
   private handleResize(): void {
@@ -246,32 +290,16 @@ export class ProjectSlideshow {
   /* ── Progress rail ── */
 
   private buildRail(): void {
-    const rail = document.createElement('nav');
-    rail.setAttribute('aria-label', 'Projects');
-    rail.className = 'progress-rail fixed bottom-6 left-1/2 z-20 flex items-end gap-3';
-    rail.style.transform = 'translateX(-50%)';
-
-    const names = ['Intro', ...PROJECTS.map((p) => p.title), 'Contact'];
-    names.forEach((name, i) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'rail-btn';
-      btn.setAttribute('aria-label', `Go to ${name}`);
-      btn.innerHTML = `<span class="rail-label font-body">${name}</span><span class="rail-dot"></span>`;
-      btn.addEventListener('click', () => this.goTo(i));
-      rail.appendChild(btn);
-      this.railButtons.push(btn);
-    });
-
-    this.container.appendChild(rail);
+    // One dot per slide. `introCount` is 0 here: this branch's intro is its own
+    // scroll sequence and doesn't share the timeline.
+    const labels = ['Work', ...PROJECTS.map((p) => p.title), 'Contact'];
+    this.rail = new ProgressRail(labels, 0, (i) => this.goTo(i));
+    this.rail.mount(this.container);
     this.updateRail();
   }
 
   private updateRail(): void {
-    this.railButtons.forEach((btn, i) => {
-      btn.classList.toggle('active', i === this.currentIndex);
-      btn.setAttribute('aria-current', i === this.currentIndex ? 'true' : 'false');
-    });
+    this.rail?.setActive(this.currentIndex);
   }
 
   /* ── View-all grid overlay ── */
@@ -279,10 +307,12 @@ export class ProjectSlideshow {
   private buildViewAllButton(): void {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = 'All projects';
     btn.setAttribute('aria-label', 'View all projects');
-    btn.className =
-      'fixed bottom-6 left-6 z-20 px-4 py-2 rounded-full font-body text-xs tracking-widest uppercase text-slate-300 border border-slate-600 hover:bg-white/10 transition-colors';
+    btn.className = 'view-all-btn fixed bottom-6 left-6 z-20 font-body';
+    btn.innerHTML = `
+      <span class="va-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>All projects</span>
+    `;
     btn.addEventListener('click', () => this.openGrid());
     this.container.appendChild(btn);
   }
@@ -296,16 +326,24 @@ export class ProjectSlideshow {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'All projects');
     overlay.className =
-      'fixed inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md p-8 overflow-y-auto';
+      'grid-overlay fixed inset-0 z-30 flex flex-col items-center justify-center p-8 overflow-y-auto';
 
     const close = document.createElement('button');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close project grid');
     close.textContent = '✕';
     close.className =
-      'fixed top-5 right-5 w-10 h-10 rounded-full text-slate-200 border border-slate-600 hover:bg-white/10 transition-colors';
+      'grid-close fixed top-5 right-5 w-10 h-10 rounded-full text-slate-200 border border-slate-600';
     close.addEventListener('click', () => this.closeGrid());
     overlay.appendChild(close);
+
+    const head = document.createElement('div');
+    head.className = 'grid-head w-full max-w-4xl flex items-end justify-between gap-4 mb-6';
+    head.innerHTML = `
+      <h2 class="font-display italic text-4xl md:text-5xl text-slate-100">All Projects</h2>
+      <span class="font-body text-xs tracking-widest uppercase text-slate-400 pb-2">${PROJECTS.length} projects</span>
+    `;
+    overlay.appendChild(head);
 
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl w-full';
@@ -314,14 +352,16 @@ export class ProjectSlideshow {
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className =
-        'group relative rounded-2xl overflow-hidden border border-white/10 hover:border-white/40 transition-colors aspect-video text-left';
+        'grid-tile relative rounded-2xl overflow-hidden border border-white/10 aspect-video text-left' +
+        (i + 1 === this.currentIndex ? ' current' : '');
+      tile.style.setProperty('--i', String(i));
       tile.setAttribute('aria-label', `Go to ${p.title}`);
       const media = p.image
-        ? `<img src="${p.image}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />`
+        ? `<img src="${p.image}" alt="" class="absolute inset-0 w-full h-full object-cover" />`
         : `<div class="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900"></div>`;
       tile.innerHTML = `
         ${media}
-        <span class="absolute bottom-0 left-0 right-0 p-3 font-body text-sm text-white bg-gradient-to-t from-black/70 to-transparent">${p.title}</span>
+        <span class="grid-tile-caption font-body"><em class="font-display italic">0${i + 1}</em>${p.title}</span>
       `;
       tile.addEventListener('click', () => {
         this.closeGrid();
@@ -331,16 +371,29 @@ export class ProjectSlideshow {
     });
 
     overlay.appendChild(grid);
+    // Clicking the dim backdrop (not a tile) closes, like Escape
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeGrid();
+    });
     this.container.appendChild(overlay);
     this.gridOverlay = overlay;
+
+    // Two frames so the closed state paints before the transition starts
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => overlay.classList.add('open'));
+    });
 
     const firstTile = grid.querySelector<HTMLElement>('button');
     firstTile?.focus();
   }
 
   private closeGrid(): void {
-    this.gridOverlay?.remove();
+    const overlay = this.gridOverlay;
+    if (!overlay) return;
     this.gridOverlay = null;
+    overlay.classList.remove('open');
+    overlay.style.pointerEvents = 'none';
+    window.setTimeout(() => overlay.remove(), 350);
     this.lastFocused?.focus();
     this.lastFocused = null;
   }
@@ -375,10 +428,15 @@ export class ProjectSlideshow {
   private createProjectSlide(project: Project, index: number): HTMLElement {
     const slide = document.createElement('section');
     slide.setAttribute('aria-label', project.title);
+    // overflow-hidden: the ghost title bleeds past the slide edges, and any
+    // spill would widen the scroll container.
     slide.className =
-      'slide snap-center shrink-0 w-screen h-dvh flex items-center justify-center p-6 md:p-12';
+      'slide relative overflow-hidden snap-center shrink-0 w-screen h-dvh flex items-center justify-center p-6 md:p-12';
 
     const css = THEMES[project.theme].css;
+
+    // Huge outline title behind the card; sized so long titles still fit.
+    const ghostSize = `min(15vw, ${(170 / project.title.length).toFixed(1)}vw)`;
 
     const tagsHtml = project.tags
       .map((tag) => `<span class="inline-block px-3 py-1 rounded-full text-xs font-body ${css.tagClass}">${tag}</span>`)
@@ -421,10 +479,12 @@ export class ProjectSlideshow {
     const textOrder = isEven ? 'order-2' : 'order-2 lg:order-1';
 
     slide.innerHTML = `
-      <div class="project-card w-full max-w-5xl backdrop-blur-md bg-white/[0.04] border ${css.borderClass} rounded-3xl overflow-hidden shadow-2xl">
+      <div class="ghost-title font-display italic" aria-hidden="true"
+           style="--ghost-accent: ${css.accent}; font-size: ${ghostSize}">${project.title}</div>
+      <div class="project-card w-full max-w-5xl backdrop-blur-md bg-black/30 border ${css.borderClass} rounded-3xl overflow-hidden shadow-2xl">
         <div class="flex flex-col lg:flex-row">
           <div class="${imageOrder} lg:w-1/2">
-            <div class="aspect-video lg:aspect-auto lg:h-full overflow-hidden relative">
+            <div class="project-media aspect-video lg:aspect-auto lg:h-full max-h-[58dvh] overflow-hidden relative">
               ${this.createMediaHtml(project)}
             </div>
           </div>
@@ -440,6 +500,7 @@ export class ProjectSlideshow {
             ${caseStudyHtml}
           </div>
         </div>
+        <div class="card-glare" aria-hidden="true"></div>
       </div>
     `;
 

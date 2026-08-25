@@ -19,8 +19,9 @@ const COUNT_OPTIONS: { label: string; value: number | null }[] = [
 ];
 
 /**
- * Floating settings panel exposing the particle system's controls:
+ * Full-height settings sidebar exposing the particle system's controls:
  * speed, noise scale, mouse force, trails, bloom, count, reset.
+ * Slides in from the right; the gear button bottom-right toggles it.
  */
 export class PlaygroundPanel {
   private scene: ParticleScene;
@@ -28,6 +29,7 @@ export class PlaygroundPanel {
   private panel: HTMLElement | null = null;
   private gear: HTMLButtonElement | null = null;
   private open = false;
+  private ac = new AbortController();
 
   constructor(scene: ParticleScene) {
     this.scene = scene;
@@ -41,77 +43,117 @@ export class PlaygroundPanel {
     gear.setAttribute('aria-expanded', 'false');
     gear.textContent = '⚙';
     gear.className =
-      'pg-gear fixed bottom-6 right-6 z-20 w-11 h-11 rounded-full text-lg text-slate-200 border border-slate-600 bg-black/30 backdrop-blur-md hover:bg-white/10 transition-all';
+      'pg-gear fixed bottom-6 right-6 z-20 w-11 h-11 rounded-full text-lg text-slate-200 border border-slate-600 bg-black/30 backdrop-blur-md';
     gear.addEventListener('click', () => this.toggle());
     container.appendChild(gear);
     this.gear = gear;
 
-    const panel = document.createElement('div');
-    panel.className = 'pg-panel fixed bottom-20 right-6 z-20';
+    const panel = document.createElement('aside');
+    panel.className = 'pg-panel fixed top-0 right-0 z-30';
     panel.setAttribute('role', 'group');
     panel.setAttribute('aria-label', 'Particle playground settings');
-    panel.hidden = true;
     panel.innerHTML = this.render();
     container.appendChild(panel);
     this.panel = panel;
+
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape' && this.open) this.setOpen(false);
+      },
+      { signal: this.ac.signal }
+    );
 
     this.bind();
     this.applyAll();
   }
 
+  destroy(): void {
+    this.setOpen(false);
+    this.ac.abort();
+    this.gear?.remove();
+    this.gear = null;
+    this.panel?.remove();
+    this.panel = null;
+  }
+
   private toggle(): void {
-    this.open = !this.open;
-    if (this.panel) this.panel.hidden = !this.open;
-    this.gear?.setAttribute('aria-expanded', String(this.open));
+    this.setOpen(!this.open);
+  }
+
+  private setOpen(open: boolean): void {
+    if (open === this.open) return;
+    this.open = open;
+    this.panel?.classList.toggle('open', open);
+    this.gear?.classList.toggle('open', open);
+    this.gear?.setAttribute('aria-expanded', String(open));
+    // Drives the gear sliding out from under the open sheet (see style.css).
+    document.documentElement.classList.toggle('panel-open', open);
   }
 
   private render(): string {
     const s = this.settings;
     const countSelected = (v: number | null) => (s.count === v ? 'selected' : '');
     return `
-      <h3 class="pg-title font-body">Playground</h3>
-
-      <div class="pg-row">
-        <label for="pg-speed" class="font-body">Speed <span class="pg-value" id="pg-speed-value">${s.speed.toFixed(2)}x</span></label>
-        <input type="range" id="pg-speed" min="0.1" max="3" step="0.05" value="${s.speed}" />
+      <div class="pg-head">
+        <h3 class="pg-heading font-display italic">Playground</h3>
+        <button type="button" id="pg-close" class="pg-close" aria-label="Close settings">✕</button>
       </div>
+      <p class="pg-sub font-body">Tune the particle field. Changes stick around.</p>
 
-      <div class="pg-row">
-        <label for="pg-noise" class="font-body">Noise scale <span class="pg-value" id="pg-noise-value">${s.noiseSize.toFixed(1)}</span></label>
-        <input type="range" id="pg-noise" min="0.3" max="4" step="0.1" value="${s.noiseSize}" />
-      </div>
+      <div class="pg-section" style="--s: 0">
+        <h4 class="pg-section-title font-body">Motion</h4>
 
-      <div class="pg-row">
-        <label for="pg-mouse-strength" class="font-body">Mouse force <span class="pg-value" id="pg-mouse-strength-value">${s.mouseStrength.toFixed(1)}x</span></label>
-        <input type="range" id="pg-mouse-strength" min="0" max="3" step="0.1" value="${s.mouseStrength}" />
-      </div>
+        <div class="pg-row">
+          <label for="pg-speed" class="font-body">Speed <span class="pg-value" id="pg-speed-value">${s.speed.toFixed(2)}x</span></label>
+          <input type="range" id="pg-speed" min="0.1" max="10" step="0.05" value="${s.speed}" />
+        </div>
 
-      <div class="pg-row pg-row-inline">
-        <span class="font-body">Mouse mode</span>
-        <button type="button" id="pg-mouse-mode" class="pg-btn font-body">${MOUSE_MODE_LABELS[s.mouseMode]}</button>
-      </div>
-
-      <div class="pg-row">
-        <label for="pg-trail" class="font-body">Trails <span class="pg-value" id="pg-trail-value">${s.trailOverride === null ? 'auto' : s.trailOverride.toFixed(2)}</span></label>
-        <div class="pg-inline">
-          <input type="range" id="pg-trail" min="0" max="0.95" step="0.01" value="${s.trailOverride ?? 0.75}" />
-          <button type="button" id="pg-trail-auto" class="pg-btn pg-btn-small font-body">auto</button>
+        <div class="pg-row">
+          <label for="pg-noise" class="font-body">Noise scale <span class="pg-value" id="pg-noise-value">${s.noiseSize.toFixed(1)}</span></label>
+          <input type="range" id="pg-noise" min="0.3" max="4" step="0.1" value="${s.noiseSize}" />
         </div>
       </div>
 
-      <div class="pg-row">
-        <label for="pg-bloom" class="font-body">Bloom <span class="pg-value" id="pg-bloom-value">${s.bloomMult.toFixed(2)}x</span></label>
-        <input type="range" id="pg-bloom" min="0" max="2" step="0.05" value="${s.bloomMult}" />
+      <div class="pg-section" style="--s: 1">
+        <h4 class="pg-section-title font-body">Interaction</h4>
+
+        <div class="pg-row">
+          <label for="pg-mouse-strength" class="font-body">Mouse force <span class="pg-value" id="pg-mouse-strength-value">${s.mouseStrength.toFixed(1)}x</span></label>
+          <input type="range" id="pg-mouse-strength" min="0" max="3" step="0.1" value="${s.mouseStrength}" />
+        </div>
+
+        <div class="pg-row pg-row-inline">
+          <span class="font-body">Mouse mode</span>
+          <button type="button" id="pg-mouse-mode" class="pg-btn font-body">${MOUSE_MODE_LABELS[s.mouseMode]}</button>
+        </div>
       </div>
 
-      <div class="pg-row pg-row-inline">
-        <label for="pg-count" class="font-body">Particles</label>
-        <select id="pg-count" class="pg-select font-body">
-          ${COUNT_OPTIONS.map((o) => `<option value="${o.value ?? 'auto'}" ${countSelected(o.value)}>${o.label}</option>`).join('')}
-        </select>
+      <div class="pg-section" style="--s: 2">
+        <h4 class="pg-section-title font-body">Rendering</h4>
+
+        <div class="pg-row">
+          <label for="pg-trail" class="font-body">Trails <span class="pg-value" id="pg-trail-value">${s.trailOverride === null ? 'auto' : s.trailOverride.toFixed(2)}</span></label>
+          <div class="pg-inline">
+            <input type="range" id="pg-trail" min="0" max="0.95" step="0.01" value="${s.trailOverride ?? 0.75}" />
+            <button type="button" id="pg-trail-auto" class="pg-btn pg-btn-small font-body">auto</button>
+          </div>
+        </div>
+
+        <div class="pg-row">
+          <label for="pg-bloom" class="font-body">Bloom <span class="pg-value" id="pg-bloom-value">${s.bloomMult.toFixed(2)}x</span></label>
+          <input type="range" id="pg-bloom" min="0" max="2" step="0.05" value="${s.bloomMult}" />
+        </div>
+
+        <div class="pg-row pg-row-inline">
+          <label for="pg-count" class="font-body">Particles</label>
+          <select id="pg-count" class="pg-select font-body">
+            ${COUNT_OPTIONS.map((o) => `<option value="${o.value ?? 'auto'}" ${countSelected(o.value)}>${o.label}</option>`).join('')}
+          </select>
+        </div>
       </div>
 
-      <div class="pg-row">
+      <div class="pg-footer" style="--s: 3">
         <button type="button" id="pg-reset" class="pg-btn pg-btn-wide font-body">Reset particles</button>
       </div>
     `;
@@ -122,6 +164,8 @@ export class PlaygroundPanel {
   }
 
   private bind(): void {
+    this.q<HTMLButtonElement>('pg-close').addEventListener('click', () => this.setOpen(false));
+
     const speed = this.q<HTMLInputElement>('pg-speed');
     speed.addEventListener('input', () => {
       this.settings.speed = parseFloat(speed.value);
