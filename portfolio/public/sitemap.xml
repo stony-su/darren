@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Single-page app: the project deep links (/#vertex, /#onyx, ...) are URL
+  fragments, which Google ignores, so the site has exactly one indexable URL.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://wenxuansu.com/</loc>
+    <lastmod>2026-08-31</lastmod>
+  </url>
+</urlset>

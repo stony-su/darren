@@ -4,6 +4,13 @@ export interface CaseStudy {
   outcome: string;
 }
 
+/** One screen of a project, shown in the hover pinwheel on its card. */
+export interface ProjectPage {
+  /** Viewport-only capture (no browser chrome), ~16:10. */
+  src: string;
+  label: string;
+}
+
 export interface Project {
   title: string;
   description: string;
@@ -14,6 +21,10 @@ export interface Project {
   repoUrl?: string;
   theme: number; // 0-4 maps to color themes
   caseStudy?: CaseStudy;
+  /** Screens for the hover pinwheel. Omitted here on purpose: PagePinwheel
+   *  generates accent-tinted wireframe placeholders when this is absent.
+   *  TODO(darren): replace with real page captures. */
+  pages?: ProjectPage[];
 }
 
 export const PROJECTS: Project[] = [

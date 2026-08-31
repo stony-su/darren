@@ -4,6 +4,7 @@ uniform sampler2D t_pos;
 uniform float dT;
 uniform float noiseSize;
 uniform float exclusionRadius;
+uniform float exclusionStrength;
 uniform vec3  mousePos;
 uniform float mouseForce;
 uniform vec2  resolution;
@@ -61,11 +62,13 @@ void main(){
   }
 
   // Center exclusion zone — particles physically repelled from origin.
-  // Formation members ignore it (the letters live near the center).
+  // Formation members ignore it (the letters live near the center). Slides that
+  // put a card over the middle switch it off entirely (exclusionStrength -> 0)
+  // and let the card's own deflection shape the flow instead.
   vec3 toCenter = pos.xyz;
   float dist = length(toCenter);
-  if (dist > 0.001) {
-    float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive);
+  if (dist > 0.001 && exclusionStrength > 0.001) {
+    float repel = smoothstep(exclusionRadius, 0.0, dist) * (1.0 - arrive) * exclusionStrength;
     vel += normalize(toCenter) * repel * 0.0007 * timeScale;
   }
 

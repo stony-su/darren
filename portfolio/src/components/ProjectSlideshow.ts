@@ -3,6 +3,7 @@ import { PROJECTS } from '../data/projects';
 import { ParticleScene } from '../animation/scene';
 import { THEMES } from '../theme/themes';
 import { ProgressRail } from './ProgressRail';
+import { PagePinwheel } from './PagePinwheel';
 
 /** Per-slide ambient wind directions (title/closing are calm). */
 const WIND_TABLE: [number, number, number][] = [
@@ -38,6 +39,8 @@ export class ProjectSlideshow {
   private currentIndex = 0;
   private lastScrollLeft = 0;
   private ghostEls: HTMLElement[] = [];
+  private fans: PagePinwheel[] = [];
+  private openFan: PagePinwheel | null = null;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private scrollRafPending = false;
   private hashTimer: number | null = null;
@@ -99,6 +102,7 @@ export class ProjectSlideshow {
     this.setupVideoScrubbers();
     this.setupCaseStudies();
     this.setupCardTilt();
+    this.setupPageFans();
 
     window.addEventListener('keydown', this.boundKeyHandler);
     window.addEventListener('resize', this.boundResizeHandler);
@@ -158,8 +162,16 @@ export class ProjectSlideshow {
     this.currentIndex = index;
     const isEdge = index === 0 || index === this.slideCount - 1;
 
+    // Scrolling away from a hovered card leaves no pointerleave behind.
+    this.closeFan();
+    // Build the incoming card's deck now so the first hover is instant.
+    if (!isEdge) this.fans[index - 1]?.build();
+
     this.scene.setTheme(this.themeForSlide(index));
     this.scene.setAttract(isEdge);
+    // Only the centred copy slides (Work / Contact) hold the middle clear. The
+    // project slides put a card there, and its own deflection does that job.
+    this.scene.setCenterExclusion(isEdge);
     const wind = isEdge ? [0, 0, 0] : WIND_TABLE[(index - 1) % WIND_TABLE.length];
     this.scene.setWind(wind[0], wind[1], wind[2]);
 
@@ -215,12 +227,61 @@ export class ProjectSlideshow {
     });
   }
 
+  /* ── Hover deck: page pinwheel on the card image ── */
+
+  /**
+   * Hovering a card's image spins a deck of page screenshots out of it. The
+   * deck opens from the image but spreads across the whole card, so it closes
+   * on leaving the *card* — otherwise it would collapse the moment the pointer
+   * drifted off the image to look at a panel.
+   */
+  private setupPageFans(): void {
+    if (this.reducedMotion || window.matchMedia('(hover: none)').matches) return;
+
+    const slides = this.slideshowEl.querySelectorAll<HTMLElement>('.slide');
+    PROJECTS.forEach((project, i) => {
+      const card = slides[i + 1]?.querySelector<HTMLElement>('.project-card');
+      const media = card?.querySelector<HTMLElement>('.project-media');
+      if (!card || !media) return;
+
+      const fan = new PagePinwheel(card, media, project);
+      this.fans[i] = fan;
+
+      media.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch') return;
+        this.openFanFor(fan);
+      });
+      card.addEventListener('pointerleave', () => {
+        if (this.openFan === fan) this.closeFan();
+      });
+    });
+  }
+
+  private openFanFor(fan: PagePinwheel): void {
+    if (this.openFan === fan) return;
+    this.openFan?.setOpen(false);
+    this.openFan = fan;
+    fan.setOpen(true);
+    // Fanned panels are the thing to read — drop the field into slow motion so
+    // the background stops competing for the eye.
+    this.scene.setTimeScale(0.22);
+  }
+
+  private closeFan(): void {
+    if (!this.openFan) return;
+    this.openFan.setOpen(false);
+    this.openFan = null;
+    this.scene.setTimeScale(1);
+  }
+
   private handleResize(): void {
     // Keep the current slide snapped when the viewport size changes
     this.slideshowEl.style.scrollBehavior = 'auto';
     this.slideshowEl.scrollLeft = this.currentIndex * window.innerWidth;
     this.slideshowEl.style.scrollBehavior = '';
     this.updateCardRect();
+    this.closeFan();
+    this.fans.forEach((fan) => fan.refit());
   }
 
   /* ── Wheel: accumulated-delta with cooldown (trackpad-friendly) ── */
@@ -488,7 +549,7 @@ export class ProjectSlideshow {
               ${this.createMediaHtml(project)}
             </div>
           </div>
-          <div class="${textOrder} lg:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+          <div class="card-copy ${textOrder} lg:w-1/2 p-8 md:p-12 flex flex-col justify-center">
             <div class="flex items-center gap-3 mb-4">
               <span class="font-body text-xs tracking-widest uppercase ${css.textClass} opacity-50">0${index + 1}</span>
               <div class="h-px flex-1 bg-current opacity-10 ${css.textClass}"></div>

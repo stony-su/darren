@@ -69,6 +69,13 @@ export class ParticleScene {
   // Card deflection
   private cardStrengthTarget = 0;
 
+  // Center exclusion zone (1 = on)
+  private exclusionTarget = 1;
+
+  // Slow-motion scalar, independent of the playground speed slider
+  private timeScale = 1;
+  private timeScaleTarget = 1;
+
   // Text formation
   private textTexture: THREE.DataTexture | null = null;
   private textPromise: Promise<void> | null = null;
@@ -125,6 +132,7 @@ export class ParticleScene {
       dT: { value: 0 },
       noiseSize: { value: DEFAULT_SETTINGS.noiseSize },
       exclusionRadius: { value: 0.35 },
+      exclusionStrength: { value: 1.0 },
       mousePos: { value: new THREE.Vector3(0, 0, 0) },
       mouseForce: { value: 0.0 },
       t_target: { value: null },
@@ -367,6 +375,22 @@ export class ParticleScene {
     this.cardStrengthTarget = 1;
   }
 
+  /** Push particles out of the middle of the stage. Slides whose content is a
+   *  centred block need it; slides built around a card don't — the card's own
+   *  deflection already shapes the flow, and both at once reads as the field
+   *  being blown out of the screen's centre. */
+  setCenterExclusion(enabled: boolean): void {
+    this.exclusionTarget = enabled ? 1 : 0;
+  }
+
+  /** Drop the simulation into slow motion without touching the playground's
+   *  speed slider — the two multiply, so a UI reveal can dial the field down
+   *  and hand it straight back afterwards. Eases in, so it reads as the field
+   *  slowing rather than stuttering. */
+  setTimeScale(scale: number): void {
+    this.timeScaleTarget = Math.max(0.02, scale);
+  }
+
   /** Per-slide ambient wind direction. */
   setWind(x: number, y: number, z: number): void {
     this.windTarget.set(x, y, z);
@@ -438,7 +462,11 @@ export class ParticleScene {
       this.animationId = requestAnimationFrame(animate);
 
       const dT = this.clock.getDelta();
-      this.soulUniforms.dT.value = dT * this.speedMultiplier;
+
+      // Only the sim reads the slow-motion scalar; the tweens below stay on
+      // real time so theme blends and gusts keep their usual pacing.
+      this.timeScale += (this.timeScaleTarget - this.timeScale) * Math.min(1, dT * 3.5);
+      this.soulUniforms.dT.value = dT * this.speedMultiplier * this.timeScale;
 
       this.frameMonitor?.tick(dT);
 
@@ -496,6 +524,11 @@ export class ParticleScene {
       const cs = this.soulUniforms.cardStrength.value as number;
       this.soulUniforms.cardStrength.value =
         cs + (this.cardStrengthTarget - cs) * Math.min(1, dT * 3);
+
+      // Center exclusion tween (matches the card's rate so the hand-off is even)
+      const ex = this.soulUniforms.exclusionStrength.value as number;
+      this.soulUniforms.exclusionStrength.value =
+        ex + (this.exclusionTarget - ex) * Math.min(1, dT * 3);
 
       // Wind: base direction lerp + decaying gust
       this.windCurrent.lerp(this.windTarget, Math.min(1, dT * 2));

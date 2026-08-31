@@ -143,6 +143,114 @@ body {
   opacity: 1;
 }
 
+/* ── Page pinwheel: hover deck of project screens ──────────────────────────
+ * Panels live in one shared 3D space so their per-facet rotateY reads as a
+ * single curved surface. Collapsed, they stack inside the card image; open,
+ * they spin out across the card. Geometry comes from PagePinwheel.ts — the
+ * transforms here are only the ones that never change. */
+
+.page-fan {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  perspective: 1300px;
+  perspective-origin: 50% 46%;
+}
+
+.fan-stage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  /* Looking slightly down on the drum sells the curve better than dead-on. */
+  transform: rotateX(6deg);
+}
+
+.fan-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 10px;
+  overflow: hidden;
+  opacity: 0;
+  background: #0d0f18;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 22px 44px -14px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  backface-visibility: hidden;
+  /* Slight overshoot: the blades carry a little momentum into their stop,
+   * which is what makes the unfurl read as a spin rather than a snap. */
+  transition:
+    transform 720ms cubic-bezier(0.3, 1.28, 0.45, 1),
+    opacity 320ms ease;
+}
+
+.page-fan.is-live .fan-panel {
+  will-change: transform, opacity;
+}
+
+.page-fan.is-open .fan-panel {
+  opacity: 1;
+}
+
+.fan-panel img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sheen along the top edge, plus shade that deepens toward the back of the arc */
+.fan-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.07), transparent 38%),
+    rgba(6, 8, 16, var(--dim, 0));
+}
+
+.fan-label {
+  position: absolute;
+  left: 8px;
+  bottom: 7px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(8, 10, 20, 0.62);
+}
+
+/* While the deck is out, the card underneath steps back. The media element is
+ * dimmed rather than its container, so the video scrubber stays legible. */
+.project-media > img,
+.project-media > video,
+.card-copy {
+  transition:
+    opacity 0.5s ease,
+    filter 0.5s ease;
+}
+
+.project-card.fan-active .project-media > img,
+.project-card.fan-active .project-media > video,
+.project-card.fan-active .card-copy {
+  opacity: 0.26;
+  filter: blur(2px) saturate(0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fan {
+    display: none;
+  }
+}
+
+
 /* ── Ghost breakout title (behind the card, parallax on scroll) ── */
 
 .ghost-title {
