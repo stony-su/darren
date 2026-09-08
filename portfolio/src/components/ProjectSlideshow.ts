@@ -3,7 +3,7 @@ import { PROJECTS } from '../data/projects';
 import { ParticleScene } from '../animation/scene';
 import { THEMES } from '../theme/themes';
 import { ProgressRail } from './ProgressRail';
-import { PagePinwheel } from './PagePinwheel';
+import { GlassShatter } from './GlassShatter';
 
 /** Per-slide ambient wind directions (title/closing are calm). */
 const WIND_TABLE: [number, number, number][] = [
@@ -39,8 +39,8 @@ export class ProjectSlideshow {
   private currentIndex = 0;
   private lastScrollLeft = 0;
   private ghostEls: HTMLElement[] = [];
-  private fans: PagePinwheel[] = [];
-  private openFan: PagePinwheel | null = null;
+  private shatters: GlassShatter[] = [];
+  private openShatter: GlassShatter | null = null;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private scrollRafPending = false;
   private hashTimer: number | null = null;
@@ -102,7 +102,7 @@ export class ProjectSlideshow {
     this.setupVideoScrubbers();
     this.setupCaseStudies();
     this.setupCardTilt();
-    this.setupPageFans();
+    this.setupShatters();
 
     window.addEventListener('keydown', this.boundKeyHandler);
     window.addEventListener('resize', this.boundResizeHandler);
@@ -163,9 +163,9 @@ export class ProjectSlideshow {
     const isEdge = index === 0 || index === this.slideCount - 1;
 
     // Scrolling away from a hovered card leaves no pointerleave behind.
-    this.closeFan();
-    // Build the incoming card's deck now so the first hover is instant.
-    if (!isEdge) this.fans[index - 1]?.build();
+    this.openShatter?.release();
+    // Cut the incoming card's pane now so the first hover is instant.
+    if (!isEdge) this.shatters[index - 1]?.build();
 
     this.scene.setTheme(this.themeForSlide(index));
     this.scene.setAttract(isEdge);
@@ -212,6 +212,9 @@ export class ProjectSlideshow {
     if (this.reducedMotion || window.matchMedia('(hover: none)').matches) return;
     this.slideshowEl.querySelectorAll<HTMLElement>('.project-card').forEach((card) => {
       card.addEventListener('pointermove', (e) => {
+        // Frozen flat while a shatter is live: its shard layer sits on the
+        // slide and has to stay in register with the untilted picture.
+        if (card.classList.contains('shatter-arming')) return;
         const r = card.getBoundingClientRect();
         const x = (e.clientX - r.left) / r.width;
         const y = (e.clientY - r.top) / r.height;
@@ -227,15 +230,16 @@ export class ProjectSlideshow {
     });
   }
 
-  /* ── Hover deck: page pinwheel on the card image ── */
+  /* ── Hover reveal: glass shatter on the card image ── */
 
   /**
-   * Hovering a card's image spins a deck of page screenshots out of it. The
-   * deck opens from the image but spreads across the whole card, so it closes
-   * on leaving the *card* — otherwise it would collapse the moment the pointer
-   * drifted off the image to look at a panel.
+   * Dwelling on a card's image fractures it into shards that carry the
+   * project's page screens out across the card. GlassShatter wires its own
+   * pointer events (the dwell is on the image, closing is on leaving the
+   * card); the slideshow only needs to know when a pane is open so the
+   * particle field can step back.
    */
-  private setupPageFans(): void {
+  private setupShatters(): void {
     if (this.reducedMotion || window.matchMedia('(hover: none)').matches) return;
 
     const slides = this.slideshowEl.querySelectorAll<HTMLElement>('.slide');
@@ -244,34 +248,21 @@ export class ProjectSlideshow {
       const media = card?.querySelector<HTMLElement>('.project-media');
       if (!card || !media) return;
 
-      const fan = new PagePinwheel(card, media, project);
-      this.fans[i] = fan;
-
-      media.addEventListener('pointerenter', (e) => {
-        if (e.pointerType === 'touch') return;
-        this.openFanFor(fan);
-      });
-      card.addEventListener('pointerleave', () => {
-        if (this.openFan === fan) this.closeFan();
+      this.shatters[i] = new GlassShatter(card, media, project, {
+        onOpen: (s) => {
+          if (this.openShatter && this.openShatter !== s) this.openShatter.release();
+          this.openShatter = s;
+          // Floating shards are the thing to read — drop the field into slow
+          // motion so the background stops competing for the eye.
+          this.scene.setTimeScale(0.22);
+        },
+        onClose: (s) => {
+          if (this.openShatter !== s) return;
+          this.openShatter = null;
+          this.scene.setTimeScale(1);
+        },
       });
     });
-  }
-
-  private openFanFor(fan: PagePinwheel): void {
-    if (this.openFan === fan) return;
-    this.openFan?.setOpen(false);
-    this.openFan = fan;
-    fan.setOpen(true);
-    // Fanned panels are the thing to read — drop the field into slow motion so
-    // the background stops competing for the eye.
-    this.scene.setTimeScale(0.22);
-  }
-
-  private closeFan(): void {
-    if (!this.openFan) return;
-    this.openFan.setOpen(false);
-    this.openFan = null;
-    this.scene.setTimeScale(1);
   }
 
   private handleResize(): void {
@@ -280,8 +271,8 @@ export class ProjectSlideshow {
     this.slideshowEl.scrollLeft = this.currentIndex * window.innerWidth;
     this.slideshowEl.style.scrollBehavior = '';
     this.updateCardRect();
-    this.closeFan();
-    this.fans.forEach((fan) => fan.refit());
+    this.openShatter?.release();
+    this.shatters.forEach((s) => s.refit());
   }
 
   /* ── Wheel: accumulated-delta with cooldown (trackpad-friendly) ── */
@@ -606,8 +597,11 @@ export class ProjectSlideshow {
         </div>
       `;
     }
+    // No hover scale here: the shatter's arming state swells the picture in
+    // step with its crack overlay, and a second transform would put them out
+    // of register.
     return `<img src="${project.image ?? ''}" alt="${project.title} screenshot"
-                 class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />`;
+                 class="w-full h-full object-cover" />`;
   }
 
   private setupVideoScrubbers(): void {

@@ -4,7 +4,7 @@ export interface CaseStudy {
   outcome: string;
 }
 
-/** One screen of a project, shown in the hover pinwheel on its card. */
+/** One screen of a project, carried out on a shard when its card's image shatters. */
 export interface ProjectPage {
   /** Viewport-only capture (no browser chrome), ~16:10. */
   src: string;
@@ -21,8 +21,9 @@ export interface Project {
   repoUrl?: string;
   theme: number; // 0-4 maps to color themes
   caseStudy?: CaseStudy;
-  /** Screens for the hover pinwheel. Omitted here on purpose: PagePinwheel
-   *  generates accent-tinted wireframe placeholders when this is absent.
+  /** Screens shown on the shards of the hover shatter. Omitted here on
+   *  purpose: GlassShatter falls back to the accent-tinted wireframe
+   *  placeholders in placeholderPages.ts when this is absent.
    *  TODO(darren): replace with real page captures. */
   pages?: ProjectPage[];
 }
