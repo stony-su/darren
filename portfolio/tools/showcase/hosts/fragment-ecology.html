@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fragment Ecology</title>
+    <script src="/play/_stage/bridge.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #050608;
+        color: #d6dce2;
+        font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+      }
+      .host {
+        position: fixed;
+        inset: 0;
+        touch-action: none;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .caption {
+        position: fixed;
+        left: 22px;
+        bottom: 18px;
+        max-width: min(420px, calc(100vw - 44px));
+        pointer-events: none;
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+      }
+      .caption b {
+        display: block;
+        font: italic 400 26px/1.2 Georgia, serif;
+      }
+      .caption span {
+        opacity: 0.72;
+      }
+      .fallback {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div class="caption"><b id="title"></b><span id="tagline"></span></div>
+    <script src="js/core/prng.js"></script>
+    <script src="js/core/gl.js"></script>
+    <script src="js/core/piece.js"></script>
+    <script src="js/pieces/aurora.js"></script>
+    <script src="js/pieces/curl.js"></script>
+    <script src="js/pieces/reagent.js"></script>
+    <script src="js/pieces/attractor.js"></script>
+    <script src="js/pieces/physarum.js"></script>
+    <script src="js/pieces/fold.js"></script>
+    <script src="host.js"></script>
+  </body>
+</html>

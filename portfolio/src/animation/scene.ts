@@ -84,6 +84,8 @@ export class ParticleScene {
   private burst = 0;
 
   private animationId: number | null = null;
+  private paused = false;
+  private contextLost = false;
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
   private attractPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -176,6 +178,19 @@ export class ParticleScene {
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('mousemove', this.onMouseMove);
+
+    // Browsers cap live WebGL contexts and evict the oldest, which is this
+    // one. Three restores its own state; the particle positions live only in
+    // render targets, so the simulation has to be seeded again.
+    const canvas = this.renderer.domElement;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      this.contextLost = false;
+      this.rebuildCurl(this.instanceCount);
+    });
   }
 
   private buildCurl(count: number): Curl {
@@ -458,97 +473,119 @@ export class ParticleScene {
 
   start(): void {
     this.clock.start();
-    const animate = (): void => {
-      this.animationId = requestAnimationFrame(animate);
-
-      const dT = this.clock.getDelta();
-
-      // Only the sim reads the slow-motion scalar; the tweens below stay on
-      // real time so theme blends and gusts keep their usual pacing.
-      this.timeScale += (this.timeScaleTarget - this.timeScale) * Math.min(1, dT * 3.5);
-      this.soulUniforms.dT.value = dT * this.speedMultiplier * this.timeScale;
-
-      this.frameMonitor?.tick(dT);
-
-      // Theme blend
-      if (this.blend < 1) {
-        this.blend = Math.min(1, this.blend + dT / 0.7);
-      }
-      const eased = easeInOutQuad(this.blend);
-      this.bodyUniforms.uBlend.value = eased;
-
-      // Background + fog track the blend
-      this.clearColor.copy(this.colorA).lerp(this.colorB, eased);
-      this.renderer.setClearColor(this.clearColor);
-      const fog = this.bodyUniforms.uFogColor.value as THREE.Vector3;
-      if (this.post.active) {
-        fog.set(
-          this.bgSrgbA[0] + (this.bgSrgbB[0] - this.bgSrgbA[0]) * eased,
-          this.bgSrgbA[1] + (this.bgSrgbB[1] - this.bgSrgbA[1]) * eased,
-          this.bgSrgbA[2] + (this.bgSrgbB[2] - this.bgSrgbA[2]) * eased
-        );
-      } else {
-        fog.set(this.clearColor.r, this.clearColor.g, this.clearColor.b);
-      }
-
-      // Snowflake morph
-      const snow = this.bodyUniforms.uSnowflake.value as number;
-      this.bodyUniforms.uSnowflake.value = snow + (this.snowTarget - snow) * Math.min(1, dT * 4);
-
-      // Bloom + trails toward per-theme targets
-      const theme = THEMES[this.themeIndexB];
-      if (this.post.active) {
-        const target = theme.bloom;
-        const cur = this.post.getBloomStrength();
-        const goal = target.strength * this.bloomMult;
-        this.post.setBloom(cur + (goal - cur) * Math.min(1, dT * 3), target.radius, target.threshold);
-        this.post.setDamp(this.trailOverride ?? theme.afterimageDamp);
-      }
-
-      // Text formation strength ramp (in ~0.5s, out ~0.35s)
-      const ts = this.soulUniforms.targetStrength.value as number;
-      const goalActive = this.targetStrengthGoal > 0 && this.textTexture !== null;
-      const tsGoal = goalActive ? this.targetStrengthGoal : 0;
-      this.soulUniforms.targetStrength.value =
-        ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 2.2 : 3.0));
-
-      // Release-burst decay (~1s)
-      if (this.burst > 0.001) {
-        this.burst *= Math.pow(0.12, dT);
-      } else {
-        this.burst = 0;
-      }
-      this.soulUniforms.burstStrength.value = this.burst;
-
-      // Card deflection strength tween
-      const cs = this.soulUniforms.cardStrength.value as number;
-      this.soulUniforms.cardStrength.value =
-        cs + (this.cardStrengthTarget - cs) * Math.min(1, dT * 3);
-
-      // Center exclusion tween (matches the card's rate so the hand-off is even)
-      const ex = this.soulUniforms.exclusionStrength.value as number;
-      this.soulUniforms.exclusionStrength.value =
-        ex + (this.exclusionTarget - ex) * Math.min(1, dT * 3);
-
-      // Wind: base direction lerp + decaying gust
-      this.windCurrent.lerp(this.windTarget, Math.min(1, dT * 2));
-      this.gust.multiplyScalar(Math.pow(0.92, dT * 60));
-      (this.soulUniforms.windDir.value as THREE.Vector3)
-        .copy(this.windCurrent)
-        .add(this.gust);
-
-      // Ambient light breathing
-      const time = this.clock.elapsedTime;
-      this.ambientLight.intensity =
-        this.ambientConfig.baseIntensity +
-        Math.sin(time * this.ambientConfig.breathSpeed) * this.ambientConfig.pulseAmount;
-
-      this.curl.update();
-      this.post.render();
-    };
-
-    animate();
+    this.animate();
   }
+
+  /**
+   * Stop drawing entirely. Slowing the sim would still pay for every frame, and
+   * whatever is covering the page (a game, usually) wants the GPU to itself.
+   */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    if (this.animationId !== null) cancelAnimationFrame(this.animationId);
+    this.animationId = null;
+  }
+
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    // Throw away the time spent paused. getDelta is unclamped, and the whole
+    // gap landing in one step would fling the sim and read as a slow frame to
+    // the tier monitor.
+    this.clock.getDelta();
+    this.animate();
+  }
+
+  private animate = (): void => {
+    this.animationId = requestAnimationFrame(this.animate);
+    if (this.contextLost) return;
+
+    const dT = this.clock.getDelta();
+
+    // Only the sim reads the slow-motion scalar; the tweens below stay on
+    // real time so theme blends and gusts keep their usual pacing.
+    this.timeScale += (this.timeScaleTarget - this.timeScale) * Math.min(1, dT * 3.5);
+    this.soulUniforms.dT.value = dT * this.speedMultiplier * this.timeScale;
+
+    this.frameMonitor?.tick(dT);
+
+    // Theme blend
+    if (this.blend < 1) {
+      this.blend = Math.min(1, this.blend + dT / 0.7);
+    }
+    const eased = easeInOutQuad(this.blend);
+    this.bodyUniforms.uBlend.value = eased;
+
+    // Background + fog track the blend
+    this.clearColor.copy(this.colorA).lerp(this.colorB, eased);
+    this.renderer.setClearColor(this.clearColor);
+    const fog = this.bodyUniforms.uFogColor.value as THREE.Vector3;
+    if (this.post.active) {
+      fog.set(
+        this.bgSrgbA[0] + (this.bgSrgbB[0] - this.bgSrgbA[0]) * eased,
+        this.bgSrgbA[1] + (this.bgSrgbB[1] - this.bgSrgbA[1]) * eased,
+        this.bgSrgbA[2] + (this.bgSrgbB[2] - this.bgSrgbA[2]) * eased
+      );
+    } else {
+      fog.set(this.clearColor.r, this.clearColor.g, this.clearColor.b);
+    }
+
+    // Snowflake morph
+    const snow = this.bodyUniforms.uSnowflake.value as number;
+    this.bodyUniforms.uSnowflake.value = snow + (this.snowTarget - snow) * Math.min(1, dT * 4);
+
+    // Bloom + trails toward per-theme targets
+    const theme = THEMES[this.themeIndexB];
+    if (this.post.active) {
+      const target = theme.bloom;
+      const cur = this.post.getBloomStrength();
+      const goal = target.strength * this.bloomMult;
+      this.post.setBloom(cur + (goal - cur) * Math.min(1, dT * 3), target.radius, target.threshold);
+      this.post.setDamp(this.trailOverride ?? theme.afterimageDamp);
+    }
+
+    // Text formation strength ramp (in ~0.5s, out ~0.35s)
+    const ts = this.soulUniforms.targetStrength.value as number;
+    const goalActive = this.targetStrengthGoal > 0 && this.textTexture !== null;
+    const tsGoal = goalActive ? this.targetStrengthGoal : 0;
+    this.soulUniforms.targetStrength.value =
+      ts + (tsGoal - ts) * Math.min(1, dT * (tsGoal > ts ? 2.2 : 3.0));
+
+    // Release-burst decay (~1s)
+    if (this.burst > 0.001) {
+      this.burst *= Math.pow(0.12, dT);
+    } else {
+      this.burst = 0;
+    }
+    this.soulUniforms.burstStrength.value = this.burst;
+
+    // Card deflection strength tween
+    const cs = this.soulUniforms.cardStrength.value as number;
+    this.soulUniforms.cardStrength.value =
+      cs + (this.cardStrengthTarget - cs) * Math.min(1, dT * 3);
+
+    // Center exclusion tween (matches the card's rate so the hand-off is even)
+    const ex = this.soulUniforms.exclusionStrength.value as number;
+    this.soulUniforms.exclusionStrength.value =
+      ex + (this.exclusionTarget - ex) * Math.min(1, dT * 3);
+
+    // Wind: base direction lerp + decaying gust
+    this.windCurrent.lerp(this.windTarget, Math.min(1, dT * 2));
+    this.gust.multiplyScalar(Math.pow(0.92, dT * 60));
+    (this.soulUniforms.windDir.value as THREE.Vector3)
+      .copy(this.windCurrent)
+      .add(this.gust);
+
+    // Ambient light breathing
+    const time = this.clock.elapsedTime;
+    this.ambientLight.intensity =
+      this.ambientConfig.baseIntensity +
+      Math.sin(time * this.ambientConfig.breathSpeed) * this.ambientConfig.pulseAmount;
+
+    this.curl.update();
+    this.post.render();
+  };
 
   dispose(): void {
     if (this.animationId !== null) {

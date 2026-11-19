@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="/play/_stage/bridge.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>cosu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap">
+<style>
+  /* The palette tokens are rewritten by the app whenever the mode or seed changes. */
+  :root {
+    color-scheme: light;
+    --paper: #f2f2ef;
+    --ink: #1b1c23;
+    --grid: #cfd6dc;
+    --pen1: #f0359b;
+    --pen2: #0a6fd1;
+    --pen3: #d08a00;
+    --pen4: #009a57;
+    --muted: color-mix(in srgb, var(--ink) 62%, var(--paper));
+    --hair: color-mix(in srgb, var(--ink) 22%, var(--paper));
+    --panel: color-mix(in srgb, var(--paper) 92%, transparent);
+    --display: 'Syne', 'Arial Black', system-ui, sans-serif;
+    --body: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+    --mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 14px/1.5 var(--body);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+  #gl, #stage { position: fixed; inset: 0; display: block; }
+  #gl { z-index: 0; pointer-events: none; }
+  #stage { z-index: 1; touch-action: none; }
+  /* compositing: WebGL draws the stage itself, so it sits on top and lets input fall through */
+  body.compose #gl { z-index: 1; }
+  body.compose #stage { z-index: 0; }
+  body.nogl #gl { display: none; }
+  body.playing #stage { cursor: none; }
+
+  .panel {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 16px;
+    width: 372px;
+    overflow-y: auto;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+  }
+  .panel > section, .panel > header, .panel > footer { padding: 14px 20px; border-top: 1px solid var(--hair); }
+  .panel > :first-child { border-top: none; }
+
+  .wordmark { font: 800 56px/0.9 var(--display); letter-spacing: -0.045em; margin: 4px 0 8px; }
+  .wordmark span { color: var(--pen1); }
+  .tag { margin: 0; color: var(--muted); font-size: 13.5px; max-width: 38ch; text-wrap: pretty; }
+
+  .label {
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .label .hint { letter-spacing: 0.06em; text-transform: none; }
+
+  .seedrow { display: grid; grid-template-columns: 42px 1fr 42px auto; gap: 8px; }
+  .seedrow .btn[aria-label] { font-size: 17px; letter-spacing: 0; padding: 0; }
+  .seed-input {
+    width: 100%;
+    min-width: 0;
+    font: 500 20px/1 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 9px 8px;
+    text-align: center;
+  }
+
+  .btn {
+    font: 500 12px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 10px 10px;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease;
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn:focus-visible, .diff:focus-visible, .mode:focus-visible, .seed-input:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--pen2);
+    outline-offset: 2px;
+  }
+  .btn.primary {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font: 700 21px/1 var(--display);
+    letter-spacing: -0.01em;
+    text-transform: none;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .btn.primary:hover { background: color-mix(in srgb, var(--ink) 84%, var(--pen1)); }
+  .btn.wide { width: 100%; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; }
+  kbd { font: 500 11px/1 var(--mono); letter-spacing: 0.06em; border: 1px solid currentColor; padding: 4px 6px; opacity: 0.75; }
+
+  /* title block, as on a technical drawing */
+  .titleblock { display: grid; grid-template-columns: 58px 1fr 58px 1fr; column-gap: 8px; margin: 0; font-size: 14px; }
+  .titleblock dt, .titleblock dd { margin: 0; padding: 6px 0; border-top: 1px solid var(--hair); }
+  .titleblock dt { font: 500 10.5px/20px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .titleblock dd { font-weight: 500; min-width: 0; }
+  .titleblock .first { border-top: none; }
+  .titleblock dd.song { grid-column: 2 / -1; font: 700 16.5px/1.25 var(--display); text-wrap: balance; }
+  .titleblock dd.song small { font: 500 12px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+  .titleblock dd.pens { grid-column: 2 / -1; }
+  .swatches { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: -1px; }
+  .swatches i { width: 10px; height: 10px; display: block; border: 1px solid var(--ink); }
+  .swatches i:nth-child(1) { background: var(--pen1); }
+  .swatches i:nth-child(2) { background: var(--pen2); }
+  .swatches i:nth-child(3) { background: var(--pen3); }
+  .swatches i:nth-child(4) { background: var(--pen4); }
+
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--ink); }
+  .diffs { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ink); }
+  .mode, .diff {
+    font: 500 12px/1.2 var(--mono);
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--ink);
+    cursor: pointer;
+  }
+  .mode { border-top: 1px solid var(--ink); padding: 8px 4px; }
+  .mode:nth-child(3n + 1) { border-left: none; }
+  .mode:nth-child(-n + 3) { border-top: none; }
+  .diff { padding: 9px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .diff:first-child { border-left: none; }
+  .diff .stars { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mode:hover, .diff:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+  .mode[aria-checked="true"], .diff[aria-checked="true"] { background: var(--ink); color: var(--paper); }
+  .diff[aria-checked="true"] .stars { color: color-mix(in srgb, var(--paper) 70%, var(--ink)); }
+  .mode-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); min-height: 2.8em; text-wrap: pretty; }
+  .diffstats {
+    display: flex; flex-wrap: wrap; gap: 2px 12px;
+    margin-top: 8px;
+    font: 400 12px/1.4 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  .diffstats .count { flex-basis: 100%; }
+
+  /* the two ways to start stay in reach however far the panel is scrolled */
+  .play-wrap {
+    position: sticky;
+    bottom: 0;
+    padding: 12px 20px 14px;
+    background: var(--paper);
+    border-top: 1px solid var(--ink);
+  }
+  .play-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+  .play-note:empty { display: none; }
+
+  details > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after { content: '+'; font: 500 14px/0.7 var(--mono); }
+  details[open] > summary::after { content: '−'; }
+  details[open] > summary { margin-bottom: 14px; }
+  .setting { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; margin-bottom: 12px; }
+  .setting:last-child { margin-bottom: 0; }
+  .setting label { font-size: 13px; font-weight: 500; }
+  .setting output { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .setting input { grid-column: 1 / -1; }
+  .setting small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; margin-top: -2px; }
+  .check { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 500; margin-bottom: 12px; cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--ink); margin: 2px 0 0; }
+  .check small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--ink); }
+  input[type=range]::-moz-range-track { height: 1px; background: var(--ink); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -6px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 50%; cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 10px; height: 10px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 50%; cursor: pointer; }
+
+  .keys { font: 400 12px/1.8 var(--mono); color: var(--muted); margin-top: auto; }
+  .keys kbd { font-size: 10.5px; padding: 2px 5px; opacity: 1; }
+
+  /* results */
+  .grade { font: 800 104px/0.82 var(--display); letter-spacing: -0.06em; color: var(--pen1); margin-top: 6px; }
+  .grade[data-grade="F"], .grade[data-grade="D"] { color: var(--ink); }
+  .score { font: 500 26px/1 var(--mono); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; justify-content: space-between; margin-top: 16px; }
+  .score small { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: 1fr auto; margin: 0; }
+  .stats dt, .stats dd { margin: 0; padding: 7px 0; border-top: 1px solid var(--hair); }
+  .stats dt:first-of-type, .stats dd:first-of-type { border-top: none; }
+  .stats dt { color: var(--muted); }
+  .stats dd { font: 500 14px/1.5 var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  .counts { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ink); text-align: center; }
+  .counts div { padding: 8px 4px; border-left: 1px solid var(--hair); }
+  .counts div:first-child { border-left: none; }
+  .counts b { display: block; font: 500 18px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  .counts span { font: 500 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .note { margin: 0; color: var(--muted); font-size: 13px; max-width: 38ch; text-wrap: pretty; }
+  .note b { color: var(--ink); font-weight: 600; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .actions .btn { white-space: nowrap; padding-inline: 4px; }
+
+  /* seed gallery: a wall of covers beside the panel */
+  .gallery {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 404px;
+    right: 16px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--ink);
+    animation: panel-in .22s ease-out;
+  }
+  .gallery-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--hair); }
+  .gallery-head .label { margin: 0 auto 0 0; }
+  .gallery-head .btn { padding: 8px 10px; }
+  .cards { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; padding: 16px; align-content: start; }
+  .card {
+    display: grid; gap: 3px; padding: 0 0 6px; text-align: left; cursor: pointer;
+    color: var(--ink); background: transparent; border: 1px solid var(--hair); border-radius: 0;
+    font: 500 12px/1.3 var(--mono);
+  }
+  .card canvas { width: 100%; aspect-ratio: 1; display: block; background: var(--paper); border-bottom: 1px solid var(--hair); }
+  .card span { padding: 0 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .card-title { font: 700 13px/1.25 var(--display); margin-top: 5px; }
+  .card .card-meta { color: var(--muted); font-size: 11px; }
+  .card:hover { border-color: var(--ink); }
+  .card[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+  .card:focus-visible { outline: 2px solid var(--pen2); outline-offset: 2px; }
+  @keyframes panel-in { from { opacity: 0; transform: translateY(6px); } }
+  .panel { animation: panel-in .22s ease-out; }
+
+  /* pause */
+  .overlay { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 55%, transparent); z-index: 3; padding: 16px; }
+  .pause-card { background: var(--paper); border: 1px solid var(--ink); padding: 24px; width: min(340px, 100%); display: grid; gap: 10px; }
+  .pause-card h2 { font: 800 36px/1 var(--display); letter-spacing: -0.03em; margin: 0 0 6px; }
+
+  @media (max-width: 859px) {
+    .gallery { left: 0; right: 0; top: 0; bottom: 0; border: none; background: var(--paper); z-index: 3; }
+    .panel { left: 0; right: 0; top: 0; bottom: 0; width: auto; border: none; background: var(--paper); }
+    .panel > section, .panel > header, .panel > footer, .play-wrap { padding-inline: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
+    .panel, .gallery { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="stage" aria-label="Playfield"></canvas>
+
+<aside id="menu" class="panel" aria-label="Song select">
+  <header>
+    <h1 class="wordmark">cosu<span>.</span></h1>
+    <p class="tag">A rhythm game drawn by algorithms. Each seed composes a song and its map. Every hit plots a figure, and your timing error is the disorder in the drawing.</p>
+  </header>
+
+  <section>
+    <div class="label"><span>Seed</span><span class="hint">← → to browse</span></div>
+    <div class="seedrow">
+      <button id="prev" class="btn" type="button" aria-label="Previous seed">←</button>
+      <input id="seed-input" class="seed-input" type="number" min="1" max="9999999" aria-label="Seed number">
+      <button id="next" class="btn" type="button" aria-label="Next seed">→</button>
+      <button id="rand" class="btn" type="button">Random</button>
+    </div>
+    <button id="browse" class="btn wide" type="button" aria-expanded="false">Browse covers <kbd>G</kbd></button>
+  </section>
+
+  <section>
+    <dl class="titleblock">
+      <dt class="first">Title</dt><dd class="song first"><span id="tb-title">—</span> <small id="tb-opus"></small></dd>
+      <dt>Key</dt><dd id="tb-key">—</dd>
+      <dt>Tempo</dt><dd id="tb-tempo">—</dd>
+      <dt>Groove</dt><dd id="tb-groove">—</dd>
+      <dt>Length</dt><dd id="tb-length">—</dd>
+      <dt>Pens</dt><dd class="pens"><span id="tb-pens">—</span><span class="swatches" aria-hidden="true"><i></i><i></i><i></i><i></i></span></dd>
+    </dl>
+    <button id="preview" class="btn wide" type="button" aria-pressed="false" title="Play the song's first peak (P)">▶ Preview</button>
+  </section>
+
+  <section>
+    <div class="label"><span>Mode</span><span class="hint">background and colour world</span></div>
+    <div class="modes" role="radiogroup" aria-label="Mode">
+      <button class="mode" type="button" role="radio" data-mode="plotter">Plotter</button>
+      <button class="mode" type="button" role="radio" data-mode="truchet">Truchet</button>
+      <button class="mode" type="button" role="radio" data-mode="penrose">Penrose</button>
+      <button class="mode" type="button" role="radio" data-mode="hyperbolic">Hyperbolic</button>
+      <button class="mode" type="button" role="radio" data-mode="julia">Julia</button>
+      <button class="mode" type="button" role="radio" data-mode="newton">Newton</button>
+      <button class="mode" type="button" role="radio" data-mode="lyapunov">Lyapunov</button>
+      <button class="mode" type="button" role="radio" data-mode="kleinian">Kleinian</button>
+      <button class="mode" type="button" role="radio" data-mode="tunnel">Menger</button>
+      <button class="mode" type="button" role="radio" data-mode="mandelbulb">Mandelbulb</button>
+      <button class="mode" type="button" role="radio" data-mode="turing">Turing</button>
+      <button class="mode" type="button" role="radio" data-mode="belousov">Belousov</button>
+      <button class="mode" type="button" role="radio" data-mode="automaton">Automaton</button>
+      <button class="mode" type="button" role="radio" data-mode="sandpile">Sandpile</button>
+      <button class="mode" type="button" role="radio" data-mode="lenia">Lenia</button>
+      <button class="mode" type="button" role="radio" data-mode="physarum">Slime mould</button>
+      <button class="mode" type="button" role="radio" data-mode="fluid">Fluid</button>
+      <button class="mode" type="button" role="radio" data-mode="ripple">Ripple</button>
+      <button class="mode" type="button" role="radio" data-mode="crystal">Crystal</button>
+      <button class="mode" type="button" role="radio" data-mode="attractor">Attractor</button>
+      <button class="mode" type="button" role="radio" data-mode="feedback">Feedback</button>
+    </div>
+    <p class="mode-note" id="mode-note"></p>
+  </section>
+
+  <section>
+    <div class="label"><span>Sheet</span><span class="hint">the preview shows a perfect run</span></div>
+    <div class="diffs" role="radiogroup" aria-label="Difficulty">
+      <button class="diff" type="button" role="radio" data-diff="easy">Easy<span class="stars"></span></button>
+      <button class="diff" type="button" role="radio" data-diff="normal">Normal<span class="stars"></span></button>
+      <button class="diff" type="button" role="radio" data-diff="hard">Hard<span class="stars"></span></button>
+      <button class="diff" type="button" role="radio" data-diff="insane">Insane<span class="stars"></span></button>
+    </div>
+    <div class="diffstats" id="diffstats"></div>
+  </section>
+
+  <section>
+    <details>
+      <summary class="label"><span>Settings</span></summary>
+      <div class="setting">
+        <label for="set-sens">Cursor sensitivity</label><output id="set-sens-value"></output>
+        <input id="set-sens" type="range" min="1" max="3" step="0.05">
+        <small>Above 1×, the game cursor travels farther than your mouse, measured from the centre of the playfield.</small>
+      </div>
+      <div class="setting">
+        <label for="set-fade">Hit patterns fade after</label><output id="set-fade-value"></output>
+        <input id="set-fade" type="range" min="0.5" max="10.5" step="0.5">
+        <small>The whole drawing still appears when the song ends.</small>
+      </div>
+      <div class="setting">
+        <label for="set-music">Music volume</label><output id="set-music-value"></output>
+        <input id="set-music" type="range" min="0" max="1" step="0.05">
+      </div>
+      <div class="setting">
+        <label for="set-fx">Hitsound volume</label><output id="set-fx-value"></output>
+        <input id="set-fx" type="range" min="0" max="1" step="0.05">
+      </div>
+      <div class="setting">
+        <label for="set-offset">Audio offset</label><output id="set-offset-value"></output>
+        <input id="set-offset" type="range" min="-120" max="120" step="5">
+        <small>If your results say “late”, raise this by about that many ms.</small>
+      </div>
+      <div class="setting">
+        <label for="set-dim">Background dim while playing</label><output id="set-dim-value"></output>
+        <input id="set-dim" type="range" min="0" max="0.9" step="0.05">
+      </div>
+      <div class="setting">
+        <label for="set-effects">Bloom effects</label><output id="set-effects-value"></output>
+        <input id="set-effects" type="range" min="0" max="1.2" step="0.05">
+        <small>Combo, section and hit blooms. 0% turns them off.</small>
+      </div>
+      <label class="check" for="set-reactive">
+        <input id="set-reactive" type="checkbox">
+        <span>Music reacts to your play<small>Hits fill the arrangement in. A miss thins it out and takes the melody away until your next hit.</small></span>
+      </label>
+      <label class="check" for="set-glass">
+        <input id="set-glass" type="checkbox">
+        <span>Glass notes<small>Notes refract the background behind them.</small></span>
+      </label>
+      <label class="check" for="set-finish">
+        <input id="set-finish" type="checkbox">
+        <span>Print finish<small>Each mode's own finish: misregistered inks, a cathode-ray tube, halftone, dither.</small></span>
+      </label>
+      <label class="check" for="set-post">
+        <input id="set-post" type="checkbox">
+        <span>Glow and lens ripples<small>Turn off if the game stutters.</small></span>
+      </label>
+      <div class="setting">
+        <label for="set-scale">Render resolution</label><output id="set-scale-value"></output>
+        <input id="set-scale" type="range" min="0.6" max="1" step="0.05">
+        <small>Lowered automatically if frames run long. Raise it again here.</small>
+      </div>
+      <div class="setting">
+        <label for="set-field">Flow field density</label><output id="set-field-value"></output>
+        <input id="set-field" type="range" min="0" max="1.5" step="0.05">
+        <small>Plotter mode only.</small>
+      </div>
+    </details>
+  </section>
+
+  <footer class="keys">
+    <kbd>Z</kbd> <kbd>X</kbd> or mouse buttons to hit · hold for sliders and spinners<br>
+    <kbd>Esc</kbd> pause · <kbd>`</kbd> restart · <kbd>P</kbd> preview the song
+  </footer>
+
+  <div class="play-wrap">
+    <button id="play" class="btn primary" type="button">Plot it <kbd>Enter</kbd></button>
+    <button id="watch" class="btn wide" type="button">Watch a perfect run <kbd>A</kbd></button>
+    <p class="play-note" id="play-note"></p>
+  </div>
+</aside>
+
+<aside id="results" class="panel" aria-label="Results" hidden>
+  <header>
+    <div class="label"><span id="r-status">Plot complete</span></div>
+    <div class="grade" id="r-grade" data-grade="S">S</div>
+    <div class="score"><small>Score</small><span id="r-score">00000000</span></div>
+  </header>
+  <section>
+    <div class="counts">
+      <div><b id="r-300">0</b><span>300</span></div>
+      <div><b id="r-100">0</b><span>100</span></div>
+      <div><b id="r-50">0</b><span>50</span></div>
+      <div><b id="r-miss">0</b><span>miss</span></div>
+    </div>
+  </section>
+  <section>
+    <dl class="stats">
+      <dt>Accuracy</dt><dd id="r-acc">—</dd>
+      <dt>Max combo</dt><dd id="r-combo">—</dd>
+      <dt>Unstable rate</dt><dd id="r-ur">—</dd>
+      <dt>Mean error</dt><dd id="r-mean">—</dd>
+      <dt>Sheet</dt><dd id="r-sheet">—</dd>
+    </dl>
+  </section>
+  <section>
+    <div class="label"><span>The drawing</span></div>
+    <p class="note"><b id="r-title"></b>. <span id="r-note"></span></p>
+  </section>
+  <section class="actions">
+    <button id="r-retry" class="btn" type="button">Retry</button>
+    <button id="r-next" class="btn" type="button">Next seed</button>
+    <button id="r-menu" class="btn" type="button">Menu</button>
+  </section>
+</aside>
+
+<section id="gallery" class="gallery" aria-label="Seed gallery" hidden>
+  <div class="gallery-head">
+    <div class="label"><span>Seeds <span id="g-range"></span></span></div>
+    <button id="g-prev" class="btn" type="button" aria-label="Earlier seeds">←</button>
+    <button id="g-next" class="btn" type="button" aria-label="Later seeds">→</button>
+    <button id="g-shuffle" class="btn" type="button">Shuffle</button>
+    <button id="g-close" class="btn" type="button">Close</button>
+  </div>
+  <div class="cards" id="g-cards"></div>
+</section>
+
+<div id="pause" class="overlay" hidden>
+  <div class="pause-card" role="dialog" aria-label="Paused">
+    <h2>Paused</h2>
+    <button id="p-continue" class="btn" type="button">Continue · Esc</button>
+    <button id="p-retry" class="btn" type="button">Retry · `</button>
+    <button id="p-quit" class="btn" type="button">Quit to menu</button>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/composer.js"></script>
+<script src="js/synth.js"></script>
+<script src="js/map.js"></script>
+<script src="js/figures.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/gl.js"></script>
+<script src="js/bgmodes.js"></script>
+<script src="js/bgmodes2.js"></script>
+<script src="js/bgmodes3.js"></script>
+<script src="js/bgmodes4.js"></script>
+<script src="js/bgmodes5.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/game.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+  <script src="stage-adapter.js"></script>
+  </body>
+</html>

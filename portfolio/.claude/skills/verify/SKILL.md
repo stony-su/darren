@@ -31,11 +31,17 @@ npm run dev            # http://localhost:5173 (run in background)
 - Intro: wait ~4s after load → particles form "DARREN"; scroll by
   `window.innerHeight` steps through 5 lines; past the end → slideshow.
 - Skip button ("Skip intro") top-right; sessionStorage `introSeen` auto-skips.
-- Slideshow: ArrowLeft/Right/Home/End; hash per slide (#vertex … #contact);
-  deep link (e.g. `/#turntable`) must skip the intro entirely.
+- Slideshow: ArrowLeft/Right/Home/End; hash per slide (#rico-rite … #contact);
+  deep link (e.g. `/#ink`) must skip the intro entirely.
 - Rail dots (`.rail-btn`), "All projects" grid overlay (Escape closes),
   case-study expand (`.case-study-toggle`), playground gear (`.pg-gear`,
   sliders `#pg-speed` etc., count select `#pg-count` triggers a live rebuild).
+- Play stage: `.card-play` opens `.play-stage`; `.ps-close` always closes it.
+  Builds load in `.ps-frame` from `/play/<slug>/index.html`. The parent's rAF
+  stops while it is open. In games, a tap of Esc is the game's and a 600 ms hold
+  leaves the stage.
+- Showcase media: `node tools/showcase/check.mjs` validates every film, still and
+  stage against `src/data/projects.ts`. See `tools/showcase/README.md`.
 - Reduced motion: context `reducedMotion: 'reduce'` → straight to slideshow.
 - Console must stay clean except: aborted font requests (driver-induced) and
   a `THREE.Clock` deprecation warning (known, cosmetic).

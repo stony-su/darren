@@ -30,10 +30,10 @@ function svgUri(body: string): string {
 
 export function pageArt(accent: string, variant: number): string {
   const a = accent;
-  const bg = '#0d0f18';
-  const bar = '#151a29';
-  const line = '#242a3d';
-  const edge = '#333b55';
+  const bg = '#171c2b';
+  const bar = '#222941';
+  const line = '#3d4767';
+  const edge = '#6b78a3';
 
   const nav = `
     <rect width="1440" height="900" fill="${bg}"/>
@@ -91,7 +91,7 @@ export function pageArt(accent: string, variant: number): string {
     // App dashboard: rail, stat row, chart, side list.
     case 2:
       body = `
-        <rect y="70" width="240" height="742" fill="#101422"/>
+        <rect y="70" width="240" height="742" fill="#1c2237"/>
         <rect x="32" y="118" width="120" height="14" rx="7" fill="${a}" fill-opacity="0.7"/>
         <rect x="32" y="176" width="160" height="12" rx="6" fill="${line}"/>
         <rect x="32" y="214" width="140" height="12" rx="6" fill="${line}"/>

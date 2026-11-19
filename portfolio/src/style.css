@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* The self-hosted games and the media tooling are not this site's markup. Left
+ * to itself Tailwind would scan megabytes of game bundle for class names. */
+@source not "../public";
+@source not "../tools";
+
 /* ── Tailwind Theme Extension ── */
 @theme {
   --font-display: 'Playfair Display', Georgia, serif;
@@ -144,398 +149,72 @@ body {
   opacity: 1;
 }
 
-/* ── Glass shatter: hover reveal of project screens ───────────────────────
- * Dwelling on a card's image etches hairline cracks across it; when they
- * meet, the pane fractures into shards of liquid glass that drift out over
- * the whole slide. The biggest shards turn into windows onto the project's
- * other pages, the mid-size ones keep their fragment of the picture, and the
- * slivers from the impact scatter as clear chips. Cells, flight paths and
- * stagger come from GlassShatter.ts as inline styles and custom properties
- * (--d open delay, --dc close delay, --gd glint delay, --cd crack delay,
- * --inv 1/shard-scale for screen-pixel strokes); only the constant styling
- * lives here. The layer sits on the slide so it can spread past the card. */
+/* ── Liquid glass: hover reveal of project screens ────────────────────────
+ * Resting on a card's picture crazes it, a bright front runs out from under
+ * the pointer, and the pane comes apart into slabs of glass that drift out
+ * across the slide in real depth. Almost none of that is CSS: the shards are
+ * geometry on a WebGL layer over the page (src/glass/), lit and refracted by
+ * a shader. What lives here is only the page around them — the layer itself,
+ * the cursor while the cloud can be spun, and how the card gets out of the
+ * way. Even the picture's fade is driven from LiquidGlass.ts, because it has
+ * to stay exactly complementary to the glass drawn over it. */
 
-.shatter {
-  position: absolute;
+.glass-layer {
+  position: fixed;
   inset: 0;
-  z-index: 20;
+  /* Over the slideshow (10) and the cards, under the progress rail (20) so
+   * the rail stays readable with a shard passing behind it. Never takes the
+   * pointer: the slide underneath is what listens for the drag. */
+  z-index: 15;
   pointer-events: none;
 }
 
-.shatter:not(.is-live) {
-  display: none;
+/* With the cloud out, the slide stops being selectable text: a drag that
+ * crosses a gap between shards must not start highlighting the copy. */
+.slide.glass-live {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* Holds the rim gradient; must not be display:none or references break */
-.shatter-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+/* The cursor follows the pick, not the pane: only a shard is a handle. */
+.slide.glass-grab {
+  cursor: grab;
 }
 
-/* The stage sits exactly over the image. Perspective lives here so each
- * shard's tilt is drawn against the slide centre the cloud gathers around. */
-.shatter-stage {
-  position: absolute;
-  perspective: 1600px;
-  transform: scale(1);
-  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+.slide.glass-dragging,
+.slide.glass-dragging * {
+  cursor: grabbing !important;
 }
 
-.shatter.is-arming .shatter-stage {
-  transform: scale(1.02);
-}
-
-/* Once the pane is out the swell relaxes (the flight paths are planned at
- * scale 1); it comes back during the flight home so the shards land in
- * register with the picture, which is still at 1.02 then. */
-.shatter.is-open .shatter-stage {
-  transform: scale(1);
-}
-
-/* Stress bloom at the impact point while the cracks creep */
-.shatter-glow {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  background: radial-gradient(
-    circle at var(--ix, 50%) var(--iy, 50%),
-    color-mix(in srgb, var(--shatter-accent) 45%, white) 0%,
-    color-mix(in srgb, var(--shatter-accent) 30%, transparent) 16%,
-    transparent 52%
-  );
-  transition: opacity 0.6s ease;
-}
-
-.shatter.is-arming .shatter-glow {
-  opacity: 0.5;
-}
-
-/* A brief, accent-edged burst at the impact as the pane gives way */
-.shatter-flash {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  background: radial-gradient(
-    240px circle at var(--ix, 50%) var(--iy, 50%),
-    rgba(255, 255, 255, 0.7),
-    color-mix(in srgb, var(--shatter-accent) 45%, transparent) 38%,
-    transparent 72%
-  );
-}
-
-.shatter-flash.is-firing {
-  animation: shatterFlash 0.55s ease-out both;
-}
-
-@keyframes shatterFlash {
-  0% { opacity: 0; }
-  12% { opacity: 0.6; }
-  100% { opacity: 0; }
-}
-
-/* Cracks: one path per shared cell edge, drawn outward from the impact by a
- * dash offset. --len is the edge length, --cd its distance-based delay. */
-.shatter-cracks {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transition: opacity 0.26s ease;
-}
-
-.shatter-cracks path {
-  fill: none;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-  stroke-dasharray: var(--len, 0);
-  stroke-dashoffset: var(--len, 0);
-  transition: stroke-dashoffset 0.28s ease;
-}
-
-.shatter-cracks .crack-glow {
-  stroke: var(--shatter-accent);
-  stroke-width: 4;
-  opacity: 0.55;
-  filter: blur(2px);
-}
-
-.shatter-cracks .crack-core {
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 1;
-}
-
-.shatter.is-arming .shatter-cracks path {
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.24s cubic-bezier(0.55, 0, 0.45, 1) var(--cd, 0ms);
-}
-
-.shatter.is-open .shatter-glow,
-.shatter.is-open .shatter-cracks,
-.shatter.is-closing .shatter-cracks {
-  opacity: 0;
-}
-
-.shatter.is-open .shatter-glow {
-  transition-duration: 1s;
-}
-
-/* Shards: the wrapper flies (transform from GlassShatter.ts), the body is the
- * clipped slab and carries the faces. Same function list at both ends so the
- * browser can interpolate. No will-change on purpose: a promoted layer keeps
- * its raster scale, and these grow up to 2× — without the hint Chrome
- * re-rasterises them sharp once the flight ends. */
-.shard {
-  position: absolute;
-  inset: 0;
-  transform: translate3d(0px, 0px, 0px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
-  transition:
-    transform 0.78s cubic-bezier(0.5, 0, 0.15, 1) var(--dc, 0ms),
-    opacity 0.4s ease var(--dc, 0ms);
-}
-
-/* Liquid: a touch of overshoot so the shards settle like something with mass
- * and surface tension, not something on rails. */
-.shatter.is-open .shard {
-  transition:
-    transform 1.1s cubic-bezier(0.34, 1.28, 0.5, 1) var(--d, 0ms),
-    opacity 0.7s ease var(--d, 0ms);
-}
-
-.shatter.is-open .shard.is-sliver {
-  opacity: 0.9;
-}
-
-/* The slab: frosted backdrop, a milk-white body warming to the accent at the
- * lower right. Only once the pane is out — assembled over the picture, the
- * shards have to stay invisible. */
-.shard-body {
-  position: absolute;
-  inset: 0;
-}
-
-.shatter.is-open .shard-body,
-.shatter.is-closing.has-faces .shard-body {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.03) 45%,
-    color-mix(in srgb, var(--shatter-accent) 16%, transparent)
-  );
-  -webkit-backdrop-filter: blur(12px) saturate(1.6);
-  backdrop-filter: blur(12px) saturate(1.6);
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-  .shatter.is-open .shard-body,
-  .shatter.is-closing.has-faces .shard-body {
-    background: linear-gradient(
-      135deg,
-      rgba(40, 44, 70, 0.72),
-      rgba(16, 18, 32, 0.72) 60%,
-      color-mix(in srgb, var(--shatter-accent) 30%, rgba(16, 18, 32, 0.72))
-    );
-  }
-}
-
-.shard-hero,
-.shard-page {
-  position: absolute;
-  display: block;
-  object-fit: cover;
-  opacity: 0;
-}
-
-.shard-hero {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-/* Faces appear the instant the pane breaks (they match the picture beneath
- * exactly). Then page shards cross-fade to their screen during the flight,
- * and the picture fragments go slightly see-through so the glass reads. */
-.shatter.has-faces .shard-hero {
-  opacity: 1;
-}
-
-.shatter.is-closing .shard-hero {
-  transition: opacity 0.38s ease var(--dc, 0ms);
-}
-
-.shatter.is-open .shard.is-page .shard-hero {
-  opacity: 0;
-  transition: opacity 0.42s ease calc(var(--d, 0ms) + 0.24s);
-}
-
-.shatter.is-open .shard.is-glass .shard-hero {
-  opacity: 0.88;
-  transition: opacity 0.6s ease calc(var(--d, 0ms) + 0.3s);
-}
-
-.shatter.is-open .shard.is-sliver .shard-hero {
-  opacity: 0.6;
-  transition: opacity 0.6s ease calc(var(--d, 0ms) + 0.3s);
-}
-
-.shard-page {
-  transition: opacity 0.38s ease var(--dc, 0ms);
-}
-
-.shatter.is-open .shard-page {
-  opacity: 1;
-  transition: opacity 0.42s ease calc(var(--d, 0ms) + 0.24s);
-}
-
-/* Surface: light from the top left, a soft caustic that drifts across every
- * few seconds, and a bevelled rim along the exact silhouette. */
-.shard-tint {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  background: linear-gradient(
-    118deg,
-    rgba(255, 255, 255, 0.24) 0%,
-    rgba(255, 255, 255, 0.06) 22%,
-    rgba(255, 255, 255, 0) 44%,
-    color-mix(in srgb, var(--shatter-accent) 12%, transparent) 100%
-  );
-  transition: opacity 0.4s ease var(--dc, 0ms);
-}
-
-.shatter.is-open .shard-tint {
-  opacity: 1;
-  transition: opacity 0.6s ease calc(var(--d, 0ms) + 0.15s);
-}
-
-.shard-gloss {
-  position: absolute;
-  top: -30%;
-  bottom: -30%;
-  left: 0;
-  width: 55%;
-  opacity: 0;
-  background: radial-gradient(
-    ellipse 50% 60% at 50% 50%,
-    rgba(255, 255, 255, 0.42),
-    rgba(255, 255, 255, 0.14) 45%,
-    rgba(255, 255, 255, 0) 72%
-  );
-  transform: translateX(-130%) rotate(16deg);
-  transition: opacity 0.25s ease;
-}
-
-.shatter.is-open .shard-gloss {
-  opacity: 1;
-  animation: shardGlint 6.2s cubic-bezier(0.45, 0, 0.25, 1) var(--gd, 0ms) infinite;
-}
-
-@keyframes shardGlint {
-  0% { transform: translateX(-130%) rotate(16deg); }
-  20% { transform: translateX(320%) rotate(16deg); }
-  100% { transform: translateX(320%) rotate(16deg); }
-}
-
-.shard-rim {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  opacity: 0;
-  transition: opacity 0.3s ease var(--dc, 0ms);
-}
-
-.shatter.is-open .shard-rim {
-  opacity: 1;
-  transition: opacity 0.5s ease calc(var(--d, 0ms) + 0.2s);
-}
-
-.shard-rim path {
-  fill: none;
-  stroke-linejoin: round;
-}
-
-/* Half of each stroke falls outside the clip. Widths are screen pixels
- * (--inv undoes the shard's scale): a 10px frosted band, a 2px accent
- * fringe, a 1px bright core lit from the top left (gradient set in
- * GlassShatter.ts). */
-.shard-rim .rim-band {
-  stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: calc(20px * var(--inv, 1));
-}
-
-.shard-rim .rim-fringe {
-  stroke: var(--shatter-accent);
-  stroke-opacity: 0.45;
-  stroke-width: calc(4px * var(--inv, 1));
-}
-
-.shard-rim .rim-core {
-  stroke-width: calc(2px * var(--inv, 1));
-}
-
-.shard-label {
-  position: absolute;
-  padding: calc(3px * var(--inv, 1)) calc(10px * var(--inv, 1));
-  border-radius: 999px;
-  font-family: var(--font-body);
-  font-size: calc(10px * var(--inv, 1));
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(8, 10, 20, 0.58);
-  border: calc(1px * var(--inv, 1)) solid rgba(255, 255, 255, 0.22);
-  opacity: 0;
-  transform: translate(-50%, -50%) translateY(6px);
-  transition:
-    opacity 0.25s ease,
-    transform 0.25s ease;
-}
-
-.shatter.is-open .shard-label {
-  opacity: 1;
-  transform: translate(-50%, -50%);
-  transition:
-    opacity 0.5s ease calc(var(--d, 0ms) + 0.55s),
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--d, 0ms) + 0.55s);
-}
-
-/* The card beneath. Its pointer tilt and lift are frozen flat the moment the
- * pane arms, so the shard layer (which lives on the slide) stays in register
- * with the picture; once the glass is out the card eases back a step. While
- * arming, the picture swells with the stage so the cracks stay on the glass;
- * once the pane is out it blurs back to a ghost and the copy steps back with
- * it. On the way home the picture waits for the shards to land before it
- * reappears. */
-.project-card.shatter-arming {
+/* The card underneath. Its tilt and lift freeze the moment the pane crazes,
+ * because the shards are laid out against where the picture *lays out*, not
+ * where a hover transition has it this frame. Once the glass is out the card
+ * steps back into the dark so the shards are the only thing in focus. */
+.project-card.glass-arming {
   --rx: 0deg !important;
   --ry: 0deg !important;
   --lift: 0px !important;
   transition:
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.6s ease,
     box-shadow 0.5s ease;
 }
 
-/* With the glass out, the card recedes: a step back and into the dark, so
- * the shards are what's in front. */
-.project-card.shatter-active {
+.project-card.glass-open {
   --push: 0.965;
-  opacity: 0.55;
+  opacity: 0.34;
 }
 
+/* No opacity transition on the picture: LiquidGlass.ts writes that value
+ * every frame, and a transition would fight it and lag the hand-over. */
 .project-media > img,
 .project-media > video {
-  transition:
-    opacity 0.55s ease,
-    filter 0.55s ease,
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: filter 0.5s ease;
+}
+
+.project-card.glass-open .project-media > img,
+.project-card.glass-open .project-media > video {
+  filter: blur(10px) saturate(0.6);
 }
 
 .card-copy {
@@ -544,37 +223,13 @@ body {
     filter 0.5s ease;
 }
 
-.project-card.shatter-arming .project-media > img,
-.project-card.shatter-arming .project-media > video {
-  transform: scale(1.02);
-}
-
-.project-card.shatter-active .project-media > img,
-.project-card.shatter-active .project-media > video {
-  opacity: 0.1;
-  filter: blur(14px) saturate(0.5);
-  transform: scale(1.08);
-  transition:
-    opacity 0.45s ease 0.05s,
-    filter 0.6s ease 0.05s,
-    transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.project-card.shatter-returning .project-media > img,
-.project-card.shatter-returning .project-media > video {
-  transition:
-    opacity 0.3s ease 0.5s,
-    filter 0.3s ease 0.5s,
-    transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.project-card.shatter-active .card-copy {
+.project-card.glass-open .card-copy {
   opacity: 0.22;
   filter: blur(2px) saturate(0.8);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shatter {
+  .glass-layer {
     display: none;
   }
 }
@@ -643,53 +298,444 @@ body {
   scrollbar-width: none;
 }
 
-/* ── Video Scrub Bar ── */
+/* ── Project card contents ── */
 
-.video-scrub {
-  padding: 8px 12px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
-  z-index: 5;
+/* Off-screen slides skip layout and paint. Their size is fixed by the deck, so
+ * the scroll positions don't depend on what is inside them. */
+.slide {
+  content-visibility: auto;
+}
+
+/* The picture is on a dark ground until its film or poster arrives. */
+.project-media {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  max-height: 38dvh;
+  background: #0b0d16;
+}
+
+/* Side by side: match whatever height the copy needs. */
+@media (min-width: 1024px) {
+  .project-media {
+    aspect-ratio: auto;
+    height: 100%;
+    max-height: none;
+  }
+}
+
+/* Wide enough for the film to set the card's height at its own 3:2. */
+@media (min-width: 1280px) {
+  .project-media {
+    aspect-ratio: 3 / 2;
+    height: auto;
+    min-height: 100%;
+  }
+}
+
+/* Only the copy needs frosting: the film covers everything behind its half.
+ * The particles can pass behind it as a solid white mass, so the ground has to
+ * stay dark enough for the text whatever is drifting past. */
+.card-copy {
+  background: rgba(7, 8, 12, 0.62);
+  -webkit-backdrop-filter: blur(12px) brightness(0.5);
+  backdrop-filter: blur(12px) brightness(0.5);
+}
+
+.card-facts {
+  display: flex;
+  gap: clamp(1rem, 2vw, 1.75rem);
+  margin: 0 0 1.1rem;
+}
+
+.card-facts > div {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+
+.card-facts dd {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.card-facts dt {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
+  color: rgb(148, 163, 184);
+}
+
+.card-play span {
+  display: inline-block;
+  margin-right: 0.3em;
+  font-size: 0.72em;
+}
+
+.card-credits {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  color: rgb(148, 163, 184);
+}
+
+.card-credits a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.card-credits a:hover {
+  color: var(--accent);
+}
+
+/* A short screen can't hold a stacked card, so the card scrolls within itself. */
+@media (max-width: 1023px) {
+  .project-card {
+    max-height: calc(100dvh - 10.5rem);
+    margin-bottom: 4.5rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .card-tags {
+    display: none;
+  }
+
+  .card-facts dd {
+    font-size: 1.2rem;
+  }
+
+  /* Three buttons fit on one line, which keeps the card off the timeline. */
+  .card-links {
+    gap: 0.5rem;
+  }
+
+  .card-links > * {
+    padding-inline: 0.85rem;
+  }
+}
+
+/* ── Play stage ───────────────────────────────────────────────────────────
+ * The real project, over everything. It is opaque on purpose: once it has
+ * faded in, the deck, the particle canvas and the film grain are all hidden so
+ * that nothing is composited over or under a running game. */
+
+.play-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: #07070d;
+  color: rgb(226, 232, 240);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.play-stage.open {
+  opacity: 1;
+}
+
+html.stage-open #app > :not(.play-stage),
+html.stage-open .glass-layer {
+  visibility: hidden;
+}
+
+html.stage-open body::after {
+  display: none;
+}
+
+.ps-bar,
+.ps-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1.1rem;
+}
+
+.ps-bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ps-foot {
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ps-id {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+.ps-count {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: rgb(100, 116, 139);
+}
+
+.ps-title {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--accent);
+}
+
+.ps-controls {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ps-control {
+  flex: none;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.76rem;
+  color: rgb(203, 213, 225);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.video-scrub-track {
+.ps-control:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ps-control[aria-pressed='true'] {
+  color: #0b0b12;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ps-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.ps-link {
+  font-size: 0.76rem;
+  color: rgb(148, 163, 184);
+  transition: color 0.2s ease;
+}
+
+.ps-link:hover {
+  color: var(--accent);
+}
+
+.ps-close {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  color: rgb(226, 232, 240);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.ps-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent-border);
+}
+
+.ps-body {
   position: relative;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: height 0.15s ease;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
 }
 
-.video-scrub:hover .video-scrub-track {
-  height: 6px;
-}
-
-.video-scrub-progress {
+.ps-frame {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.85);
-  width: 0%;
-  pointer-events: none;
+  border: 0;
+  background: #000;
 }
 
-.video-scrub-thumb {
+.ps-loader {
   position: absolute;
-  top: 50%;
-  left: 0%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translate(-50%, -50%) scale(0);
-  transition: transform 0.15s ease;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #07070d;
+  background-position: center;
+  background-size: cover;
+  transition: opacity 0.4s ease, visibility 0.4s;
   pointer-events: none;
 }
 
-.video-scrub:hover .video-scrub-thumb {
-  transform: translate(-50%, -50%) scale(1);
+.ps-loader::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 10, 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.ps-loader.done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.ps-loader-text {
+  position: relative;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: rgb(203, 213, 225);
+  animation: psPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes psPulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.ps-hint {
+  margin: 0;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgb(148, 163, 184);
+}
+
+.ps-nav {
+  flex: none;
+  max-width: 24vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: rgb(148, 163, 184);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.ps-nav:hover {
+  color: var(--accent);
+}
+
+.ps-film-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-film,
+.ps-flip {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ps-film[hidden],
+.ps-flip[hidden] {
+  display: none;
+}
+
+.ps-film-wrap.portrait {
+  padding: 1rem;
+}
+
+.ps-film-wrap.portrait .ps-film {
+  width: auto;
+  border-radius: 1.75rem;
+  box-shadow: 0 0 0 8px #14141c, 0 0 0 9px rgba(255, 255, 255, 0.12);
+}
+
+.ps-phone {
+  height: calc(100% - 2rem);
+  aspect-ratio: 9 / 19.5;
+  padding: 10px;
+  background: #14141c;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 2.4rem;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.ps-phone-screen {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 1.8rem;
+  background: #fff;
+  scrollbar-width: none;
+}
+
+.ps-phone-screen img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (max-width: 720px) {
+  .ps-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .ps-id {
+    flex: 1;
+  }
+
+  .ps-controls {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+  }
+
+  .ps-link {
+    display: none;
+  }
+
+  .ps-foot {
+    gap: 0.5rem;
+  }
+
+  .ps-nav {
+    max-width: 22vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-stage,
+  .ps-loader {
+    transition-duration: 0.01s;
+  }
+
+  .ps-loader-text {
+    animation: none;
+  }
 }
 
 /* ── Theme CSS custom properties (defaults; scene.ts updates per theme) ── */
@@ -712,8 +758,21 @@ body {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(720px, calc(100vw - 200px));
+  width: min(720px, calc(100vw - 380px)); /* clear of both corner buttons */
   z-index: 20;
+}
+
+/* The particles often pass under the rail, so it brings its own dark ground. */
+.progress-rail::before {
+  content: '';
+  position: absolute;
+  inset: -8px -14px;
+  z-index: -1;
+  border-radius: 999px;
+  background: rgba(7, 8, 12, 0.5);
+  -webkit-backdrop-filter: blur(8px) brightness(0.55);
+  backdrop-filter: blur(8px) brightness(0.55);
+  pointer-events: none;
 }
 
 .rail-track,
@@ -791,11 +850,12 @@ body {
   position: absolute;
   bottom: 100%;
   left: 50%;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8);
   opacity: 0;
   transform: translateX(-50%) translateY(4px);
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -810,11 +870,25 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* With this many stops, neighbouring labels would print over each other: the
+ * dot being pointed at speaks, and the current one waits. */
+.rail-row:has(.rail-btn:hover) .rail-btn.active:not(:hover) .rail-label {
+  opacity: 0;
+}
+
 /* Narrow screens: rise above the corner buttons and tighten the dots */
 @media (max-width: 720px) {
   .progress-rail {
-    bottom: 72px;
+    bottom: 76px;
     width: calc(100vw - 48px);
+  }
+
+  .progress-rail::before {
+    inset: -6px -10px;
+  }
+
+  .rail-label {
+    margin-bottom: 8px;
   }
 
   .rail-btn {
@@ -836,6 +910,9 @@ body {
 /* ── Playground sidebar ── */
 .pg-gear {
   cursor: pointer;
+  background: rgba(7, 8, 12, 0.5);
+  backdrop-filter: blur(8px) brightness(0.55);
+  -webkit-backdrop-filter: blur(8px) brightness(0.55);
   transition:
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     right 0.5s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1084,11 +1161,11 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgb(203, 213, 225);
-  background: rgba(10, 10, 20, 0.35);
+  background: rgba(7, 8, 12, 0.5);
   border: 1px solid rgb(71, 85, 105);
   border-radius: 999px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px) brightness(0.55);
+  -webkit-backdrop-filter: blur(8px) brightness(0.55);
   cursor: pointer;
   transition:
     transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1146,6 +1223,26 @@ body {
   opacity: 1;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+/* Centred while it fits, and top-aligned once it doesn't: plain `center` would
+ * push the first row above the scroll origin, out of reach. */
+.grid-overlay {
+  justify-content: safe center;
+}
+
+.grid-tile-film {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.grid-tile-film.on {
+  opacity: 1;
 }
 
 .grid-head {
