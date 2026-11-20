@@ -640,19 +640,6 @@ export class ProjectSlideshow {
       .map((tag) => `<span class="inline-block px-3 py-1 rounded-full text-xs font-body ${css.tagClass}">${esc(tag)}</span>`)
       .join('');
 
-    const factsHtml = project.facts?.length
-      ? `<dl class="card-facts">
-          ${project.facts
-            .map(
-              (f) => `<div>
-                <dt class="font-body">${esc(f.label)}</dt>
-                <dd class="font-display italic ${css.textClass}">${esc(f.value)}</dd>
-              </div>`,
-            )
-            .join('')}
-        </dl>`
-      : '';
-
     const secondary = `px-5 py-2.5 rounded-full text-sm font-body font-medium ${css.textClass} border ${css.borderClass} hover:bg-white/5 transition-colors`;
     const primary = `px-6 py-2.5 rounded-full text-sm font-body font-medium text-white ${css.buttonClass} transition-colors`;
     const liveLabel = esc(project.liveLabel ?? 'Visit site');
@@ -668,16 +655,6 @@ export class ProjectSlideshow {
         </button>` : ''}
       </div>
     `;
-
-    const creditsHtml = project.credits?.length
-      ? `<p class="card-credits font-body">${project.credits
-          .map((c) =>
-            c.href
-              ? `<a href="${esc(c.href)}" target="_blank" rel="noopener">${esc(c.label)}</a>`
-              : esc(c.label),
-          )
-          .join(' · ')}</p>`
-      : '';
 
     const caseStudyHtml = project.caseStudy
       ? `
@@ -721,10 +698,8 @@ export class ProjectSlideshow {
             </div>
             <h3 class="font-display italic text-4xl xl:text-[2.75rem] leading-[1.1] ${css.textClass} mb-3">${title}</h3>
             <p class="font-body text-[0.95rem] text-slate-400 leading-relaxed mb-5">${esc(project.description)}</p>
-            ${factsHtml}
             <div class="card-tags flex flex-wrap gap-2">${tagsHtml}</div>
             ${linksHtml}
-            ${creditsHtml}
             ${caseStudyHtml}
           </div>
         </div>

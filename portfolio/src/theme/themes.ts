@@ -404,6 +404,31 @@ export const THEMES: ThemeDef[] = [
       buttonClass: 'bg-amber-700 hover:bg-amber-800',
     },
   },
+  {
+    name: 'curtain', // Lattice: the hero's cobalt and cyan glass curtain over deep navy
+    bg: 0x040a1c,
+    palette: [
+      [0.05, 0.3, 0.95],
+      [0.16, 0.71, 0.96],
+      [0.85, 0.94, 1.0],
+      [0.2, 0.25, 0.75],
+      [0.55, 0.45, 0.95],
+    ],
+    normalMode: false,
+    fx: { glow: 0.5, sparkle: 0.0, tScale: [4.0, 3.0] },
+    snowflake: 0,
+    bloom: { strength: 0.44, radius: 0.5, threshold: 0.4 },
+    afterimageDamp: 0.8,
+    css: {
+      accent: '#7dd3fc',
+      accentBorder: 'rgba(125,211,252,0.55)',
+      glowShadow: '0 4px 24px rgba(125,211,252,0.3), 0 0 48px rgba(125,211,252,0.1)',
+      textClass: 'text-sky-300',
+      borderClass: 'border-sky-300/25',
+      tagClass: 'bg-sky-400/15 text-sky-100',
+      buttonClass: 'bg-blue-700 hover:bg-blue-800',
+    },
+  },
 ];
 
 /** All text classes, for classList cleanup when switching themes. */

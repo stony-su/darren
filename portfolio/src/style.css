@@ -341,52 +341,10 @@ body {
   backdrop-filter: blur(12px) brightness(0.5);
 }
 
-.card-facts {
-  display: flex;
-  gap: clamp(1rem, 2vw, 1.75rem);
-  margin: 0 0 1.1rem;
-}
-
-.card-facts > div {
-  display: flex;
-  flex-direction: column-reverse;
-  min-width: 0;
-}
-
-.card-facts dd {
-  margin: 0;
-  font-size: 1.45rem;
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
-.card-facts dt {
-  margin-top: 0.2rem;
-  font-size: 0.68rem;
-  line-height: 1.25;
-  letter-spacing: 0.03em;
-  color: rgb(148, 163, 184);
-}
-
 .card-play span {
   display: inline-block;
   margin-right: 0.3em;
   font-size: 0.72em;
-}
-
-.card-credits {
-  margin-top: 0.85rem;
-  font-size: 0.72rem;
-  color: rgb(148, 163, 184);
-}
-
-.card-credits a {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.card-credits a:hover {
-  color: var(--accent);
 }
 
 /* A short screen can't hold a stacked card, so the card scrolls within itself. */
@@ -402,10 +360,6 @@ body {
 @media (max-width: 639px) {
   .card-tags {
     display: none;
-  }
-
-  .card-facts dd {
-    font-size: 1.2rem;
   }
 
   /* Three buttons fit on one line, which keeps the card off the timeline. */

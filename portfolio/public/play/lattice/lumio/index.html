@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lattice - Find exactly what you need, nearby</title>
+    <link rel="icon" type="image/png" href="./assets/lattice-logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+
+    <nav class="nav glass" id="nav">
+      <div class="bb-wrap" aria-hidden="true">
+        <div class="bb-beam bb-beam-1"></div>
+        <div class="bb-beam bb-beam-2"></div>
+      </div>
+      <a class="brand" href="#">
+        <svg class="brand-mark" viewBox="0 0 24 24"><use href="#lattice-mark" /></svg>
+        <span class="brand-word">Lattice</span>
+      </a>
+      <div class="links">
+        <a href="#why" data-section="why">Why Lattice</a><a href="#how" data-section="how">How it works</a><a href="#categories" data-section="categories">Categories</a>
+      </div>
+      <div class="right">
+        <a class="signin nav-action nav-action--secondary" href="#/home" data-route="#/home">Open app</a>
+        <button class="nav__burger" id="navBurger" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
+    </nav>
+
+
+    <div class="nav__drawer" id="navDrawer">
+      <button class="drawer-close" id="drawerClose">✕</button>
+      <a href="#why" data-section="why">Why Lattice</a>
+      <a href="#how" data-section="how">How it works</a>
+      <a href="#categories" data-section="categories">Categories</a>
+      <a href="#/home" data-route="#/home" style="opacity:.7;font-size:20px">Open app</a>
+    </div>
+
+
+    <div class="curtain-spacer" aria-hidden="true"></div>
+    <div class="curtain" id="curtain" data-screen-label="01 Hero">
+      <div class="curtain__bg" aria-hidden="true"></div>
+      <div class="curtain__hero-logo" id="introCenterLogo" aria-hidden="true">
+        <svg class="brand-mark" viewBox="0 0 24 24"><use href="#lattice-mark" /></svg>
+        <span class="brand-word">Lattice</span>
+      </div>
+      <video class="curtain__video" autoplay muted loop playsinline preload="auto">
+        <source src="./assets/screen1-glass.mp4" type="video/mp4" />
+      </video>
+      <div class="curtain__overlay"></div>
+      <div class="curtain__tint" aria-hidden="true"></div>
+
+      <section class="hero">
+        <h1 style="line-height: 1.06; padding: 0px; font-size: 60px; text-align: center">
+          <span class="line line1" style="margin: 0px">Tell Us What You Need.</span
+          ><span
+            class="line line2"
+            style="font-weight: 400; line-height: 1; letter-spacing: -1.2px; margin: 0px"
+            >We&rsquo;ll Find It&nbsp;<span class="it">Nearby.</span></span
+          >
+        </h1>
+        <p class="sub">
+          <span class="sub-line">Describe what you want: budget, timing, and distance.</span
+          ><span class="sub-line">Lattice structures the request and matches you with</span
+          ><span class="sub-line">ranked offers from nearby local businesses.</span>
+        </p>
+        <div class="ctas">
+          <button class="btn primary" data-route="#/home" style="padding: 0px 16px; letter-spacing: -0.9px">
+            <div class="bb-wrap" aria-hidden="true">
+              <div class="bb-beam bb-beam-1"></div>
+              <div class="bb-beam bb-beam-2"></div>
+            </div>
+            Open app
+            <svg
+              viewBox="0 0 18 18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="width:17px;height:17px;flex-shrink:0"
+            >
+              <path d="M5 13L13 5" />
+              <path d="M6 5h7v7" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+
+      <div class="browser" aria-hidden="true" style="margin: 0px; font-weight: 400; width: 1224px">
+        <div class="bb-wrap" aria-hidden="true">
+          <div class="bb-beam bb-beam-1"></div>
+          <div class="bb-beam bb-beam-2"></div>
+        </div>
+        <div class="browser__chrome">
+          <div class="browser__nav">
+            <img src="./assets/Navegation.svg" alt="" style="height:14px;width:auto;opacity:.85" />
+          </div>
+          <div class="browser__url">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:10.994px;height:10.994px;flex-shrink:0"
+            >
+              <rect x="0.5" y="0.5" width="10.9941" height="10.9941" rx="5.49707" stroke="white" />
+              <path d="M3.39221 5.92828L8.60089 5.92828" stroke="white" stroke-linecap="round" />
+              <path d="M5.99689 3.39343L5.99689 8.60211" stroke="white" stroke-linecap="round" /></svg
+            ><img src="./assets/Candado.svg" alt="" style="height:10px;width:auto;opacity:.85" /> app.lattice.app / discover
+          </div>
+          <div class="browser__icons">
+            <img src="./assets/Options.svg" alt="" style="height:16px;width:auto;opacity:.85" />
+          </div>
+        </div>
+        <div class="dashboard">
+          <aside class="sidebar" style="border-width: 0px 1px 0px 0px; padding: 16px; margin: 0px">
+            <div class="agency">
+              <div
+                class="agency__logo"
+                style="display:flex;width:32px;height:32px;padding:6px;align-items:center;justify-content:center;border-radius:8px;background:#fff;border:1px solid rgba(14,10,7,.12);overflow:hidden"
+              >
+                <svg viewBox="0 0 24 24" style="width:100%;height:100%;color:#0E0A07"><use href="#lattice-mark" /></svg>
+              </div>
+              <div class="agency__meta">
+                <div class="k">WORKSPACE</div>
+                <div class="n">Maya · Brooklyn</div>
+              </div>
+              <div class="agency__unfold">
+                <img src="./assets/Unfold_More.svg" alt="" style="width:16px;height:16px;object-fit:contain;opacity:.5" />
+              </div>
+            </div>
+            <h6>MAIN MENU</h6>
+            <div class="menu">
+              <a class="active" href="#"
+                ><img
+                  src="./assets/material-symbols-light_home-rounded.svg"
+                  alt=""
+                  style="width:14px;height:14px;display:inline-block;vertical-align:middle"
+                />
+                Discover</a
+              >
+              <a href="#"
+                ><img
+                  src="./assets/material-symbols-light_home-rounded_1.svg"
+                  alt=""
+                  style="width:14px;height:14px;display:inline-block;vertical-align:middle"
+                />
+                Requests</a
+              >
+              <a href="#"
+                ><img
+                  src="./assets/material-symbols-light_home-rounded_1.svg"
+                  alt=""
+                  style="width:14px;height:14px;display:inline-block;vertical-align:middle"
+                />
+                Saved</a
+              >
+              <a href="#"
+                ><img
+                  src="./assets/material-symbols-light_home-rounded_1.svg"
+                  alt=""
+                  style="width:14px;height:14px;display:inline-block;vertical-align:middle"
+                />
+                Claimed</a
+              >
+            </div>
+          </aside>
+          <div class="main">
+            <div class="breadcrumbs" style="gap: 6px">
+              <span>Dashboard</span> <span>›</span> <strong>Discover</strong>
+            </div>
+            <div class="welcome">Your matches are ready, Maya</div>
+            <div class="ping-chip">
+              <span class="ping-chip__tag">ACTIVE REQUEST</span>
+              <span class="ping-chip__text">Lunch after school - under $15 - within 3 km - open 3:30-5:00 PM</span>
+              <span class="ping-chip__count">3 matches</span>
+            </div>
+            <div class="kpis">
+              <div class="kpi">
+                <div class="inner">
+                  <div>
+                    <div class="label">BEST MATCH</div>
+                    <div class="val" style="margin-top:12px">96%</div>
+                    <div class="desc">Rosa&rsquo;s Cantina · Tacos</div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="44" height="49" viewBox="0 0 44 49" fill="none">
+                    <path d="M1 33L1 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M8 0L8 49" stroke="#0E0A07" stroke-width="2" />
+                    <path d="M15 20L15 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M22 12L22 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M29 30L29 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M36 20L36 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M43 16L43 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                  </svg>
+                </div>
+                <div class="foot">
+                  <span class="dist"
+                    ><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" width="14" height="14">
+                      <path d="M7 12.5c2.8-3 4.2-5.2 4.2-7A4.2 4.2 0 0 0 2.8 5.5c0 1.8 1.4 4 4.2 7Z" stroke-linejoin="round" />
+                      <circle cx="7" cy="5.4" r="1.3" /></svg
+                    >0.4 km · open now</span
+                  ><span class="match-pill">$11</span>
+                </div>
+              </div>
+              <div class="kpi">
+                <div class="inner">
+                  <div>
+                    <div class="label">GREAT MATCH</div>
+                    <div class="val" style="margin-top:12px">92%</div>
+                    <div class="desc">Blue Bottle · Coffee</div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="44" height="49" viewBox="0 0 44 49" fill="none">
+                    <path d="M1 33L1 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M8 5L8 49" stroke="#0E0A07" stroke-width="2" />
+                    <path d="M15 20L15 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M22 35L22 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M29 30L29 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M36 20L36 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M43 9L43 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                  </svg>
+                </div>
+                <div class="foot">
+                  <span class="dist"
+                    ><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" width="14" height="14">
+                      <path d="M7 12.5c2.8-3 4.2-5.2 4.2-7A4.2 4.2 0 0 0 2.8 5.5c0 1.8 1.4 4 4.2 7Z" stroke-linejoin="round" />
+                      <circle cx="7" cy="5.4" r="1.3" /></svg
+                    >0.7 km · open now</span
+                  ><span class="match-pill">$6</span>
+                </div>
+              </div>
+              <div class="kpi">
+                <div class="inner">
+                  <div>
+                    <div class="label">GOOD MATCH</div>
+                    <div class="val" style="margin-top:12px">88%</div>
+                    <div class="desc">Pages Bookshop · Retail</div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="44" height="49" viewBox="0 0 44 49" fill="none">
+                    <path d="M1 33L1 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M8 3L8 49" stroke="#0E0A07" stroke-width="2" />
+                    <path d="M15 38L15 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M22 12L22 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M29 21L29 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M36 8L36 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                    <path d="M43 9L43 49" stroke="#0E0A07" stroke-opacity="0.2" stroke-width="2" />
+                  </svg>
+                </div>
+                <div class="foot">
+                  <span class="dist"
+                    ><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" width="14" height="14">
+                      <path d="M7 12.5c2.8-3 4.2-5.2 4.2-7A4.2 4.2 0 0 0 2.8 5.5c0 1.8 1.4 4 4.2 7Z" stroke-linejoin="round" />
+                      <circle cx="7" cy="5.4" r="1.3" /></svg
+                    >1.2 km · open now</span
+                  ><span class="match-pill">$15</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="curtain__edge"></div>
+    </div>
+
+
+    <main class="below">
+      <div id="fullpage">
+
+        <div class="section fp-curtain" data-anchor="hero"></div>
+
+
+        <div class="section" data-anchor="why" id="why">
+          <section class="sect s2" data-screen-label="02 Mission">
+            <div class="s2-inner">
+              <div class="ovals" aria-hidden="true">
+                <div class="o"></div>
+                <div class="o" style="border-radius:0"></div>
+                <div class="o"></div>
+                <div class="o"></div>
+              </div>
+              <div class="reveal">
+                <div class="grid">
+                  <div>
+                    <span class="eyebrow"><span class="sq"></span>WHY LATTICE</span>
+                  </div>
+                  <div>
+                    <h2>The shortest path from<br />intent to a local offer</h2>
+                    <p class="lede">
+                      <span class="sub-line"
+                        >Lattice starts with what someone is ready</span
+                      ><span class="sub-line">to buy, then connects that intent to the</span
+                      ><span class="sub-line">businesses nearby that can answer it.</span
+                      ><span class="sub-line">Less browsing. More relevant matches.</span
+                      ><span class="sub-line">A cleaner way for local demand and local</span
+                      ><span class="sub-line">supply to find each other.</span>
+                    </p>
+                  </div>
+                  <div></div>
+                </div>
+              </div>
+              <div class="bottom">
+                <div class="left">
+                  <p>
+                    Lattice turns a specific need into a short list of claimable offers, with the match reasons made clear before anyone commits.
+                  </p>
+                  <button class="meet" data-section="how">
+                    See how it works
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+                      <path d="M4 10h12 M11 5l5 5-5 5" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="stats">
+                  <div class="stat violet">
+                    <div class="v" data-count="1200" data-suffix="+" data-format="int">0+</div>
+                    <div class="l">LOCAL<br />BUSINESSES<br />ON LATTICE</div>
+                  </div>
+                  <div class="stat blue">
+                    <div class="v" data-count="30" data-suffix="s" data-format="int">0s</div>
+                    <div class="l">AVG TIME<br />TO A<br />MATCH</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+
+        <div class="section" data-anchor="how" id="how">
+          <section class="sect s3" data-screen-label="03 How it works">
+            <div class="s3-grid-lines"><i></i><i></i><i></i><i></i></div>
+            <div class="s3-inner">
+              <div class="s3-head">
+                  <span class="corner l">THE THREE PARTS OF</span>
+                <span class="corner r">YOUR PERFECT MATCH</span>
+                <div class="eyebrow"><span class="sq"></span>HOW IT WORKS</div>
+                <h2>From a Simple Ask to<br /><span class="it">the Right Offer</span></h2>
+                <p>
+                  <span class="sub-line">Most apps make you dig through listings. Lattice ranks nearby</span
+                  ><span class="sub-line">offers against your request, explains each match, then lets you</span
+                  ><span class="sub-line">claim and verify the one that fits.</span>
+                </p>
+              </div>
+
+              <div class="cards3">
+
+                <div class="card3 a">
+                  <div class="conn-list">
+                    <div class="conn">
+                      <div class="bb-wrap" aria-hidden="true">
+                        <div class="bb-beam bb-beam-1"></div>
+                        <div class="bb-beam bb-beam-2"></div>
+                      </div>
+                      <div class="badge crit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 2v20" />
+                          <path d="M16.5 6.5C16.5 4.6 14.5 3.5 12 3.5S7.5 4.6 7.5 6.5 9.5 9.5 12 9.5s4.5 1.1 4.5 3-2 3-4.5 3-4.5-1.1-4.5-3" />
+                        </svg>
+                      </div>
+                      <div class="meta">
+                        <div class="kicker">Budget</div>
+                        <div class="name">Under $15</div>
+                      </div>
+                      <div class="live-pill">SET</div>
+                    </div>
+                    <div class="conn">
+                      <div class="bb-wrap" aria-hidden="true">
+                        <div class="bb-beam bb-beam-1"></div>
+                        <div class="bb-beam bb-beam-2"></div>
+                      </div>
+                      <div class="badge crit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 21c4.5-4.8 6.8-8.3 6.8-11.2A6.8 6.8 0 0 0 5.2 9.8C5.2 12.7 7.5 16.2 12 21Z" />
+                          <circle cx="12" cy="9.4" r="2.2" />
+                        </svg>
+                      </div>
+                      <div class="meta">
+                        <div class="kicker">Distance</div>
+                        <div class="name">Within 3 km</div>
+                      </div>
+                      <div class="live-pill">SET</div>
+                    </div>
+                    <div class="conn">
+                      <div class="bb-wrap" aria-hidden="true">
+                        <div class="bb-beam bb-beam-1"></div>
+                        <div class="bb-beam bb-beam-2"></div>
+                      </div>
+                      <div class="badge crit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M12 7v5l3.5 2" />
+                        </svg>
+                      </div>
+                      <div class="meta">
+                        <div class="kicker">Timing</div>
+                        <div class="name">3:30-5:00 PM</div>
+                      </div>
+                      <div class="live-pill">SET</div>
+                    </div>
+                  </div>
+                  <div class="stamp">01 - REQUEST</div>
+                </div>
+
+
+                <div class="card3 b">
+                  <div class="insight-card" id="insightCard">
+                    <div class="bb-wrap" aria-hidden="true">
+                      <div class="bb-beam bb-beam-1"></div>
+                      <div class="bb-beam bb-beam-2"></div>
+                    </div>
+                    <div class="insight-head">
+                      <div class="ic">
+                        <img src="./assets/icon-ai.svg" alt="AI" style="width:24px;height:24px" />
+                      </div>
+                      <div>
+                        <div class="k">TOP MATCH</div>
+                        <div class="t">Rosa&rsquo;s Cantina</div>
+                      </div>
+                    </div>
+                    <div class="insight-msg" style="padding: 50px 4px 0px">
+                      Taco lunch combo for $11, 0.4 km away and open until 5 PM. Fits your budget, distance, and time.
+                    </div>
+                    <div class="anomaly" style="background:#2352DE">
+                      <i style="color:#2352DE"
+                        ><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5l3 3 6-7" /></svg
+                      ></i>
+                      <span>Why this matched</span>
+                    </div>
+                    <div class="saving">
+                      <div class="lbl">Match score</div>
+                      <div class="v">96<em>% match</em></div>
+                    </div>
+                  </div>
+                  <div class="stamp">02 - MATCH</div>
+                </div>
+
+
+                <div class="card3 c">
+                  <div class="runway">
+                    <div class="bb-wrap" aria-hidden="true">
+                      <div class="bb-beam bb-beam-1"></div>
+                      <div class="bb-beam bb-beam-2"></div>
+                    </div>
+                    <div class="runway-head">
+                      <div class="ic">
+                        <img
+                          src="./assets/icon-cash.svg"
+                          alt="Cash"
+                          style="width:22px;height:22px;filter:invert(23%) sepia(85%) saturate(1600%) hue-rotate(209deg)"
+                        />
+                      </div>
+                      <div>
+                        <div
+                          class="k"
+                          style="font-size:10px;letter-spacing:.1em;font-weight:700;color:rgba(255,255,255,.75)"
+                        >
+                          CLAIMED
+                        </div>
+                        <div
+                          class="t"
+                          style="font-size:17px;letter-spacing:-0.04em;font-weight:500;color:#fff;margin-top:4px"
+                        >
+                          Rosa&rsquo;s Cantina
+                        </div>
+                      </div>
+                    </div>
+                    <div class="chart">
+                      <div class="badge">VERIFIED - SAVED $11</div>
+                      <div class="chart-dot"></div>
+                      <svg viewBox="0 0 280 140" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#fff" stop-opacity=".25" />
+                            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                          </linearGradient>
+                          <pattern
+                            id="hatch"
+                            width="5"
+                            height="5"
+                            patternUnits="userSpaceOnUse"
+                            patternTransform="rotate(45)"
+                          >
+                            <line x1="0" y1="0" x2="0" y2="5" stroke="rgba(255,255,255,.12)" stroke-width="1.2" />
+                          </pattern>
+                          <clipPath id="chartClip">
+                            <rect class="chart-clip-rect" x="0" y="0" width="0" height="140" />
+                          </clipPath>
+                        </defs>
+                        <g clip-path="url(#chartClip)">
+
+                          <path
+                            d="M0 110 C 30 100, 60 80, 90 70 C 120 60, 150 55, 180 35 C 210 22, 240 18, 280 16 L 280 140 L 0 140 Z"
+                            fill="url(#g1)"
+                          />
+
+                          <path
+                            d="M93 120 C 93 78, 210 68, 280 65
+                               L 280 16 C 240 18, 210 22, 180 35 C 150 55, 120 60, 93 70 L 93 120 Z"
+                            fill="url(#hatch)"
+                          />
+
+                          <path
+                            class="chart-line"
+                            d="M0 110 C 30 100, 60 80, 90 70 C 120 60, 150 55, 180 35 C 210 22, 240 18, 280 16"
+                            stroke="#fff"
+                            stroke-width="2"
+                            fill="none"
+                          />
+
+                          <path
+                            class="chart-dash"
+                            d="M93 120 C 93 78, 210 68, 280 65"
+                            stroke="rgba(255,255,255,.55)"
+                            stroke-width="1.5"
+                            fill="none"
+                            stroke-dasharray="6 4"
+                          />
+                        </g>
+                      </svg>
+                      <div class="axis">
+                        <span>WK 1</span><span>WK 2</span><span>WK 3</span><span>WK 4</span>
+                      </div>
+                    </div>
+                    <div class="runway-foot" style="margin: 20px 0px 0px">
+                      <div class="v">Review unlocked</div>
+                      <div class="d">Redemption verified at 4:12 PM - rate your visit</div>
+                    </div>
+                  </div>
+                  <div class="stamp">03 - CLAIM</div>
+                </div>
+              </div>
+
+              <div
+                style="text-align:center;color:rgba(255,255,255,.75);font-size:10px;letter-spacing:.1em;font-weight:700;margin-top:-32px"
+              >
+
+              </div>
+            </div>
+          </section>
+
+
+        </div>
+        <div class="section" data-anchor="categories" id="categories">
+          <section class="sect s4" data-screen-label="04 Categories">
+            <div class="s4-grid-lines"><i></i><i></i><i></i><i></i></div>
+            <div class="s4-horiz"></div>
+            <div class="s4-inner">
+              <div class="orbit" id="orbit">
+                <div class="tile lumio g5" aria-hidden="true">
+                  <div class="bb-wrap" aria-hidden="true">
+                    <div class="bb-beam bb-beam-1"></div>
+                    <div class="bb-beam bb-beam-2"></div>
+                  </div>
+                  <svg viewBox="0 0 24 24" style="width:58%;height:auto;color:#fff"><use href="#lattice-mark" /></svg>
+                </div>
+                <div class="lumio-label" aria-hidden="true">
+                  <div class="n">Lattice</div>
+                  <div class="k">EVERY LOCAL CATEGORY</div>
+                </div>
+
+                <div class="orbit-ring">
+
+                  <div class="tile cat empty g1" aria-hidden="true" style="background:#8B5E3C">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 9h12a3 3 0 0 1 0 6h-1" />
+                        <path d="M4 9v5a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4" />
+                        <path d="M7 3v2M10 3v2M13 3v2" />
+                      </svg>
+                      <span class="cat-l">Coffee</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g2" data-group="a" style="background:#F5614A">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3v8a2 2 0 0 0 4 0V3M8 11v10" />
+                        <path d="M16 3c-1.5 0-2.5 2-2.5 5s1 4 2.5 4 2.5-1 2.5-4-1-5-2.5-5ZM16 16v5" />
+                      </svg>
+                      <span class="cat-l">Food</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g3" data-group="a" style="background:#2352DE">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 8h14l-1 12H6L5 8Z" />
+                        <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+                      </svg>
+                      <span class="cat-l">Retail</span>
+                    </span>
+                  </div>
+
+                  <div class="tile cat g4" data-group="a" style="background:#0E0A07">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9v6M21 9v6M6 7v10M18 7v10" />
+                        <path d="M6 12h12" />
+                      </svg>
+                      <span class="cat-l">Fitness</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g6" data-group="a" style="background:#C2569B">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3l1.8 4.4L18 9l-4.2 1.6L12 15l-1.8-4.4L6 9l4.2-1.6L12 3Z" />
+                        <path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9L18 15Z" />
+                      </svg>
+                      <span class="cat-l">Beauty</span>
+                    </span>
+                  </div>
+
+                  <div class="tile cat g7" data-group="a" style="background:#2CA01C">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 5h2l1.6 10.4a1.5 1.5 0 0 0 1.5 1.3h7a1.5 1.5 0 0 0 1.5-1.2L20 8H6" />
+                        <circle cx="9.5" cy="20" r="1.2" />
+                        <circle cx="17" cy="20" r="1.2" />
+                      </svg>
+                      <span class="cat-l">Grocery</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g8" data-group="a" style="background:#18498B">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 5a2 2 0 0 1 2-2h6v16H6a2 2 0 0 0-2 2V5Z" />
+                        <path d="M20 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2V5Z" />
+                      </svg>
+                      <span class="cat-l">Books</span>
+                    </span>
+                  </div>
+                  <div class="tile cat empty g9" aria-hidden="true" style="background:#635BFF">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 6.5a3.5 3.5 0 0 0-5 0l-1 1 3 3M14.5 6.5l3 3-7.5 7.5-4 1 1-4" />
+                      </svg>
+                      <span class="cat-l">Services</span>
+                    </span>
+                  </div>
+
+
+                  <div class="tile cat g1" data-group="b" style="background:#E0532F;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 7l9-3 9 3-9 13L3 7Z" />
+                        <path d="M3 7l9 3 9-3M12 10v10" />
+                      </svg>
+                      <span class="cat-l">Pizza</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g2" data-group="b" style="background:#D9A441;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12a4 4 0 0 1 4-4h8a4 4 0 0 1 0 8H8a4 4 0 0 1-4-4Z" />
+                        <path d="M9 8.5 10.5 12M13 8.5 14.5 12" />
+                      </svg>
+                      <span class="cat-l">Bakery</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g3" data-group="b" style="background:#4A154B;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 4h14l-7 8-7-8ZM12 12v8M8 21h8" />
+                      </svg>
+                      <span class="cat-l">Bar</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g4" data-group="b" style="background:#D14E8C;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="6" cy="6" r="2.5" />
+                        <circle cx="6" cy="18" r="2.5" />
+                        <path d="M8 7.5 19 18M8 16.5 19 6" />
+                      </svg>
+                      <span class="cat-l">Salon</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g6" data-group="b" style="background:#1A1A2E;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="14" rx="2" />
+                        <path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4" />
+                      </svg>
+                      <span class="cat-l">Cinema</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g7" data-group="b" style="background:#2EB67D;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 21c-1-5-5-6-5-10a5 5 0 0 1 10 0c0 4-4 5-5 10Z" />
+                        <circle cx="12" cy="11" r="2" />
+                      </svg>
+                      <span class="cat-l">Florist</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g8" data-group="b" style="background:#1AB4D7;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 6v12M6 12h12" />
+                        <rect x="4" y="4" width="16" height="16" rx="4" />
+                      </svg>
+                      <span class="cat-l">Pharmacy</span>
+                    </span>
+                  </div>
+                  <div class="tile cat g9" data-group="b" style="background:#8669B9;display:none">
+                    <span class="cat-in">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="7" cy="9" r="1.6" />
+                        <circle cx="12" cy="6.5" r="1.6" />
+                        <circle cx="17" cy="9" r="1.6" />
+                        <path d="M8.5 15c1-2 2-3 3.5-3s2.5 1 3.5 3 .8 4-1 4c-1 0-1.5-.6-2.5-.6s-1.5.6-2.5.6c-1.8 0-2-2-1-4Z" />
+                      </svg>
+                      <span class="cat-l">Pets</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="filter-list" id="filters">
+                <button class="active" data-grp="a">Food &amp; Drink</button>
+                <button data-grp="a">Retail</button>
+                <button data-grp="b">Services</button>
+                <button data-grp="a">Fitness</button>
+                <button data-grp="a">Beauty</button>
+                <button data-grp="b">Entertainment</button>
+              </div>
+
+              <div class="s4-bottom">
+                <div class="eyebrow"><span class="sq"></span>YOUR NEIGHBORHOOD</div>
+                <h2>Your whole town,<br /><span class="it">sorted by fit</span></h2>
+              </div>
+
+              <div class="int-pill">
+                <div class="av">
+                  <i
+                    ><svg viewBox="0 0 18 18" fill="currentColor"><path d="M9 1 L17 6 H1 Z M2 7h14v8H2z" /></svg
+                  ></i>
+                  <i
+                    ><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6">
+                      <rect x="2" y="2" width="6" height="6" />
+                      <rect x="10" y="10" width="6" height="6" />
+                      <path d="M8 5h2v5" /></svg
+                  ></i>
+                </div>
+                <div class="meta">
+                  <div class="t">Categories</div>
+                  <div class="s">8 NEARBY</div>
+                </div>
+              </div>
+
+              <div class="sync-stamp">MATCHES UPDATE INSTANTLY</div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="lattice-mark" viewBox="0 0 24 24">
+        <circle cx="7.6" cy="7.6" r="3.3" fill="currentColor" />
+        <circle cx="17.4" cy="6.6" r="3" fill="#29B6F6" />
+        <circle cx="15.6" cy="16.4" r="3.2" fill="currentColor" />
+        <circle cx="6.7" cy="17.4" r="3.3" fill="currentColor" />
+      </symbol>
+    </svg>
+
+    <script src="script.js"></script>
+    <script>
+      (function () {
+        function goto(hash) {
+          try {
+            (window.parent || window).location.hash = hash;
+          } catch (e) {
+            window.location.hash = hash;
+          }
+        }
+        function wire(selector, hash) {
+          document.querySelectorAll(selector).forEach(function (el) {
+            el.style.cursor = "pointer";
+            el.addEventListener("click", function (e) {
+              e.preventDefault();
+              e.stopPropagation();
+              goto(hash);
+            });
+          });
+        }
+        function wireRoutes() {
+          document.querySelectorAll("[data-route]").forEach(function (el) {
+            el.style.cursor = "pointer";
+            el.addEventListener("click", function (e) {
+              e.preventDefault();
+              e.stopPropagation();
+              goto(el.getAttribute("data-route"));
+            });
+          });
+        }
+        function wireSections() {
+          document.querySelectorAll("[data-section]").forEach(function (el) {
+            el.addEventListener("click", function (e) {
+              e.preventDefault();
+              e.stopPropagation();
+              var target = el.getAttribute("data-section");
+              if (window.__latticeScrollToSection) {
+                window.__latticeScrollToSection(target);
+              } else {
+                var section = document.getElementById(target);
+                if (section) section.scrollIntoView({ behavior: "smooth" });
+              }
+            });
+          });
+        }
+        function init() {
+          wireRoutes();
+          wireSections();
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
+    </script>
+  <script>
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && window.parent !== window) {
+          window.parent.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', repeat: e.repeat }));
+        }
+      });
+    </script>
+  </body>
+</html>

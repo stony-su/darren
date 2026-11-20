@@ -15,6 +15,15 @@
  *   build/keep                Godot web export (no threads) of a keepplatformer
  *                             copy with scale_mode set to "fractional"
  *   build/resound             `npm run itch` output (itch/out/web) of rougelike
+ *   build/lattice             `VITE_FORCE_DEMO_MODE=true vite build` of a clean
+ *                             Doppy258/lattice-nlc clone (no .env). Demo mode
+ *                             has had no data since commit aec6560, so the copy
+ *                             gets src/data/seed*.ts back from aec6560^ and
+ *                             loadData()/resetDemoData() in storageService.ts
+ *                             return buildSeedData() when Supabase is not
+ *                             configured. Then lumio/assets/screen1-glass.mp4 is
+ *                             re-encoded `-an -c:v libx264 -preset slow -crf 24`
+ *                             (17 MB -> 1.5 MB)
  *
  * Set SHOWCASE_PROJECTS to change where the local checkouts live (default
  * ~/Downloads).
@@ -112,6 +121,40 @@ const BUILDS = {
         `<meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'self'" />`,
       ),
+  },
+
+  // Demo mode signs in as a seeded user and keeps everything in localStorage.
+  // The bundle still knows the team's Supabase address (the assistant falls back
+  // to it), so the policy only lets requests reach this site, plus the map tiles,
+  // the stock photos and address search.
+  lattice: {
+    from: path.join(work, 'build/lattice'),
+    files: ['index.html', 'assets', 'lumio'],
+    html: (html) =>
+      must(
+        html,
+        '<meta charset="UTF-8" />',
+        `<meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://images.unsplash.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://nominatim.openstreetmap.org; frame-src 'self'; form-action 'none'; base-uri 'self'" />`,
+      ),
+    patch: {
+      // The landing page sits in a frame inside the app. Its buttons route the
+      // top window, which here would be the portfolio; route the app instead.
+      // Esc pressed in there would never reach the stage bridge, so pass it up.
+      'lumio/index.html': (html) =>
+        must(
+          must(html, '(window.top || window).location.hash = hash;', '(window.parent || window).location.hash = hash;'),
+          '</body>',
+          `<script>
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && window.parent !== window) {
+          window.parent.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', repeat: e.repeat }));
+        }
+      });
+    </script>
+  </body>`,
+        ),
+    },
   },
 
   'fragment-ecology': {
